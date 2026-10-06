@@ -81,14 +81,17 @@
       <a href="#contact"><span>06</span>Contact</a>
     </nav>
     <a class="menu__mail" href="mailto:contact@evanescere.xyz">contact@evanescere.xyz</a>
+    <button class="menu__classic" type="button" data-classic>Switch to classic scroll</button>
   </div>
 
   <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+  <div class="hud" id="hud" aria-hidden="true"><span id="hudNo">01 / 10</span><span id="hudName">Intro</span></div>
+  <div class="veil" id="veil" aria-hidden="true"></div>
 
   <main id="main">
 
     <!-- HERO -->
-    <section class="hero" id="top" data-mood="hero">
+    <section class="hero" id="top" data-mood="hero" data-name="Intro">
       <div class="hero__inner">
         <p class="eyebrow reveal-up"><i class="dot"></i>Web design studio</p>
         <h1 class="hero__title" id="heroTitle" aria-label="Design that lingers.">
@@ -115,7 +118,7 @@
     </section>
 
     <!-- MANIFESTO -->
-    <section class="manifesto section" id="manifesto" data-mood="deep">
+    <section class="manifesto section" id="manifesto" data-mood="deep" data-name="The premise">
       <p class="label"><span>(01)</span> The premise</p>
       <p class="manifesto__text" data-scrub>
         Attention is the scarcest thing a brand can earn, and the first few seconds decide everything. We design and build websites that command those seconds: clear in message, striking in form, and engineered to turn interest into enquiries.
@@ -128,7 +131,7 @@
     </section>
 
     <!-- THE NAME -->
-    <section class="name section" id="name" data-mood="deep">
+    <section class="name section" id="name" data-mood="deep" data-name="The name">
       <div class="name__meta">
         <p class="label"><span>(02)</span> The name</p>
         <p class="name__def"><span class="mono">e·va·nes·ce·re</span> <i>verb, Latin</i><br>To vanish. To fade like vapour.</p>
@@ -143,7 +146,7 @@
     </section>
 
     <!-- SERVICES -->
-    <section class="services section" id="services" data-mood="steel">
+    <section class="services section" id="services" data-mood="steel" data-name="Services">
       <div class="services__head">
         <p class="label"><span>(03)</span> Services</p>
         <h2 class="display" data-split="words">Everything your site needs. <em>Nothing it doesn&rsquo;t.</em></h2>
@@ -189,11 +192,52 @@
       </ol>
     </section>
 
+    <!-- THE DIFFERENCE (before / after) -->
+    <section class="diff section" id="difference" data-mood="ember" data-name="The difference">
+      <div class="diff__head">
+        <p class="label"><span>(04)</span> The difference</p>
+        <h2 class="display" data-split="words">Same business. <em>Different first impression.</em></h2>
+        <p class="diff__sub">Visitors decide in seconds. Drag to dissolve the forgettable version and see what a considered design does to the same page.</p>
+      </div>
+
+      <div class="cmp" id="cmp" style="--pos:50%">
+        <!-- AFTER (left, revealed as you drag right) -->
+        <div class="cmp__layer cmp__after" aria-hidden="true">
+          <div class="mk-new">
+            <div class="n-bar"><b>Marlow &amp; Finch</b><span>Work</span><span>Studio</span><span>Journal</span><span class="n-pill">Enquire</span></div>
+            <div class="n-hero">
+              <p class="n-eyebrow">Architecture &middot; Interiors</p>
+              <h4>Spaces that <em>hold</em> the light.</h4>
+              <p class="n-lede">Residential and cultural projects, designed slowly and built to last.</p>
+              <span class="n-pill n-pill--lg">View selected work</span>
+            </div>
+            <div class="n-orb"></div>
+            <div class="n-row"><span>01 &mdash; Coastal House</span><span>02 &mdash; The Quiet Library</span><span>03 &mdash; Fold Pavilion</span></div>
+          </div>
+          <span class="cmp__tag cmp__tag--l">Unforgettable</span>
+        </div>
+        <!-- BEFORE (right, dissolves into smoke) -->
+        <div class="cmp__layer cmp__before" aria-hidden="true">
+          <div class="mk-old">
+            <div class="o-top"><b>MARLOW &amp; FINCH ARCHITECTS</b><span>Home</span><span>About Us</span><span>Our Services</span><span>Gallery</span><span>Contact Us</span></div>
+            <div class="o-banner"><h4>Welcome to Marlow &amp; Finch Architects</h4><p>We are a leading provider of quality architectural solutions for all of your needs. Contact us today for a free quote!</p><span class="o-btn">Click Here</span></div>
+            <div class="o-cols"><div><i></i><b>Residential</b><p>Our team of experienced professionals is here to help.</p></div><div><i></i><b>Commercial</b><p>Quality service at a competitive price every time.</p></div><div><i></i><b>Renovation</b><p>Satisfaction guaranteed on all of our work.</p></div></div>
+            <div class="o-foot">&copy; Marlow &amp; Finch Architects. All rights reserved. | Privacy Policy | Sitemap</div>
+          </div>
+          <span class="cmp__tag cmp__tag--r">Forgettable</span>
+        </div>
+        <div class="cmp__edge" aria-hidden="true"><i></i><i></i></div>
+        <div class="cmp__handle" aria-hidden="true"><span><svg viewBox="0 0 24 24"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <input class="cmp__range" id="cmpRange" type="range" min="0" max="100" step="0.1" value="50" aria-label="Reveal the redesigned page">
+        <p class="cmp__note mono">Concept for a fictional studio</p>
+      </div>
+    </section>
+
     <!-- PROCESS (pinned horizontal on desktop) -->
-    <section class="process" id="process" data-mood="teal">
+    <section class="process" id="process" data-mood="teal" data-name="Process">
       <div class="process__pin" id="processPin">
         <div class="process__head">
-          <p class="label"><span>(04)</span> Process</p>
+          <p class="label"><span>(05)</span> Process</p>
           <h2 class="display" data-split="words">A clear path from <em>brief to launch.</em></h2>
         </div>
         <div class="process__track" id="processTrack">
@@ -239,9 +283,9 @@
     </section>
 
     <!-- APPROACH -->
-    <section class="approach section" id="approach" data-mood="steel">
+    <section class="approach section" id="approach" data-mood="steel" data-name="Approach">
       <div class="approach__head">
-        <p class="label"><span>(05)</span> Approach</p>
+        <p class="label"><span>(06)</span> Approach</p>
         <h2 class="display" data-split="words">How we <em>think.</em></h2>
       </div>
       <div class="approach__grid">
@@ -269,9 +313,9 @@
     </section>
 
     <!-- ENGAGEMENTS -->
-    <section class="engage section" id="engagements" data-mood="steel">
+    <section class="engage section" id="engagements" data-mood="ember" data-name="Engagements">
       <div class="engage__head">
-        <p class="label"><span>(06)</span> Engagements</p>
+        <p class="label"><span>(07)</span> Engagements</p>
         <h2 class="display" data-split="words">Ways to <em>work together.</em></h2>
         <p class="engage__sub">Every project is scoped to its goals and quoted at a fixed price, so there are no surprises.</p>
       </div>
@@ -317,9 +361,9 @@
     </section>
 
     <!-- FAQ -->
-    <section class="faq section" id="faq" data-mood="deep">
+    <section class="faq section" id="faq" data-mood="deep" data-name="Questions">
       <div class="faq__head">
-        <p class="label"><span>(07)</span> Questions</p>
+        <p class="label"><span>(08)</span> Questions</p>
         <h2 class="display" data-split="words">Good <em>questions.</em></h2>
       </div>
       <div class="faq__list" id="faqList">
@@ -351,9 +395,9 @@
     </section>
 
     <!-- CONTACT -->
-    <section class="contact section" id="contact" data-mood="violet">
+    <section class="contact section" id="contact" data-mood="violet" data-name="Start a project">
       <div class="contact__head">
-        <p class="label"><span>(08)</span> Start a project</p>
+        <p class="label"><span>(09)</span> Start a project</p>
         <h2 class="display contact__title" data-split="words">Let&rsquo;s make something <em>unforgettable.</em></h2>
         <p class="contact__sub">Four quick questions. We&rsquo;ll come back with ideas, not a sales script.</p>
       </div>
@@ -432,7 +476,7 @@
     <div class="foot__word" id="footWord" aria-hidden="true">Evanescere</div>
     <div class="foot__row">
       <span>&copy; <span id="year">2026</span> Evanescere</span>
-      <span class="foot__priv">No cookies. No tracking. No analytics.</span>
+      <span class="foot__priv">No cookies. No tracking. No analytics. <button type="button" class="foot__classic" data-classic>Classic scroll</button></span>
       <a href="#top" id="toTop" data-cursor="hover">Back to top <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
     </div>
   </footer>
