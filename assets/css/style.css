@@ -209,7 +209,7 @@ body.is-loading { overflow: hidden; }
 .hero__actions { display: flex; gap: .8rem; flex-wrap: wrap; }
 
 .hero__word {
-  font-weight: 600; font-size: 19.7vw; line-height: .76; letter-spacing: -0.065em; text-transform: none;
+  font-weight: 600; font-size: 18.7vw; line-height: .76; letter-spacing: -0.065em; text-transform: none;
   white-space: nowrap; margin: 1vh -.5vw -.5vw; text-align: center; user-select: none; will-change: transform, opacity, filter;
 }
 .hero__word .c { background: linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(200,220,255,.5) 55%, rgba(160,190,255,.04) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; padding: 0 .01em; }
