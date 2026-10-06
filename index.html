@@ -1,192 +1,448 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#04060a">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://formspree.io https://api.web3forms.com; form-action 'self' https://formspree.io https://api.web3forms.com mailto:; base-uri 'self'; object-src 'none'">
 
-  <title>EVANESCERE</title>
-  <meta name="description" content="Evanescere - Strategic Exposure Analysis for small organizations prioritizing operational resiliance.">
-  <style>
-    :root {
-      --bg: #030406;
-      --text: #ffffff;
-      --muted: rgba(255, 255, 255, 0.35);
-      --line: rgba(255, 255, 255, 0.08);
-      --serif-brand: "Iowan Old Style", "Palatino Linotype", "Libre Baskerville", Georgia, serif;
-      --sans-header: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --mono: "SF Mono", "ui-monospace", "Monaco", monospace;
-    }
+  <title>Evanescere — Web Design Studio</title>
+  <meta name="description" content="Evanescere is a web design studio. We craft fast, striking, conversion-minded websites for brands that refuse to be forgettable.">
+  <link rel="canonical" href="https://evanescere.xyz/">
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Evanescere">
+  <meta property="og:title" content="Evanescere — Design that lingers">
+  <meta property="og:description" content="A web design studio crafting fast, striking, conversion-minded websites for brands that refuse to be forgettable.">
+  <meta property="og:url" content="https://evanescere.xyz/">
+  <meta property="og:image" content="https://evanescere.xyz/assets/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
 
-    html, body {
-      height: 100%;
-      overflow: hidden; 
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--sans-header);
-      -webkit-font-smoothing: antialiased;
-    }
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.ico" sizes="any">
 
-    .bg-canvas {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      background: 
-        radial-gradient(circle at 10% 10%, rgba(30, 45, 75, 0.35) 0%, transparent 45%),
-        radial-gradient(circle at 90% 90%, rgba(20, 25, 40, 0.25) 0%, transparent 55%),
-        radial-gradient(circle at 50% 50%, rgba(10, 15, 25, 1) 0%, var(--bg) 100%);
-    }
+  <link rel="preload" href="assets/fonts/inter-tight-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/instrument-serif-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="assets/js/boot.js"></script>
 
-    main {
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      padding: 5rem 6vw; 
-    }
-
-    header {
-      margin-bottom: 5vh;
-    }
-
-    .brand {
-      font-family: var(--serif-brand);
-      font-size: 1.8rem;
-      letter-spacing: 0.5em;
-      text-transform: uppercase;
-      font-weight: 300;
-      opacity: 0.9;
-    }
-
-    .hero {
-      flex-grow: 1;
-    }
-
-    h1 {
-      font-family: var(--sans-header);
-      font-size: clamp(1.2rem, 3.2vw, 4.5rem);
-      font-weight: 700; /* Made slightly bolder for that Grotesk look */
-      text-transform: uppercase;
-      white-space: nowrap; 
-      letter-spacing: -0.04em; /* Tighter tracking for large type */
-      margin-bottom: 1.5rem;
-      color: rgba(255, 255, 255, 0.98);
-    }
-
-    .subheading {
-      font-family: var(--mono);
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 0.35em;
-      color: var(--muted);
-      margin-bottom: 8vh;
-      border-top: 1px solid var(--line);
-      padding-top: 1.5rem;
-      display: block;
-      width: 100%;
-    }
-
-    .services {
-      list-style: none;
-      max-width: 440px;
-    }
-
-    .service {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      padding: 1.2rem 0;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      display: flex;
-      justify-content: space-between;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      cursor: crosshair;
-    }
-
-    .service:hover {
-      color: var(--text);
-      border-bottom-color: var(--text);
-      padding-left: 0.75rem;
-    }
-
-    .cta-container {
-      margin-top: 4rem;
-    }
-
-    .cta {
-      display: inline-block;
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.3em;
-      color: var(--text);
-      text-decoration: none;
-      border: 1px solid var(--line);
-      padding: 1rem 2.5rem;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .cta:hover {
-      background: var(--text);
-      color: var(--bg);
-      transform: translateY(-2px); /* Subtle lift */
-    }
-
-    footer {
-      display: flex;
-      justify-content: space-between;
-      font-family: var(--mono);
-      font-size: 0.55rem;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      color: var(--muted);
-      padding-top: 2rem;
-      border-top: 1px solid var(--line);
-    }
-
-    @media (max-width: 1024px) {
-      body { overflow-y: auto; }
-      main { padding: 4rem 1.5rem; }
-      h1 { white-space: normal; font-size: 2.5rem; line-height: 1; }
-      .brand { font-size: 1.4rem; }
-    }
-  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ProfessionalService",
+    "name": "Evanescere",
+    "description": "Web design studio crafting fast, striking, conversion-minded websites.",
+    "url": "https://evanescere.xyz/",
+    "email": "contact@evanescere.xyz",
+    "serviceType": ["Web design", "Web development", "E-commerce design", "Brand design for web"]
+  }
+  </script>
 </head>
 <body>
-  <div class="bg-canvas"></div>
-  <main>
-    <header>
-      <div class="brand">Evanescere</div>
-    </header>
+  <a class="skip" href="#main">Skip to content</a>
 
-    <section class="hero">
-      <h1>Independent security reviews</h1>
-      
-      <p class="subheading">
-        Strategic Exposure Analysis for small organizations prioritizing operational resiliance.
-      </p>
+  <!-- Smoke: the living background -->
+  <canvas id="smoke" aria-hidden="true"></canvas>
+  <div class="fallback-fog" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
 
-      <div class="services">
-        <div class="service"><span>Cloud Access & Identity Governance Audits</span> <span>[01]</span></div>
-        <div class="service"><span>Backup and Recovery Verification</span> <span>[02]</span></div>
-	<div class="service"><span>Incident Readiness Check & Response Simulation</span> <span>[03]</span></div>
-	<div class="service"><span>Endpoint Exposure Assessment</span> <span>[04]</span></div>
-        <div class="service"><span>Ransomware Impact Assessment</span> <span>[05]</span></div>
-	<div class="service"><span>Security Posture Translation</span> <span>[06]</span></div>
+  <!-- Custom cursor (fine pointers only) -->
+  <div class="cursor" aria-hidden="true"><i class="cursor__ring"></i><i class="cursor__dot"></i></div>
+
+  <!-- Preloader -->
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader__word" id="loaderWord">Evanescere</div>
+    <div class="loader__meta"><span>Web design studio</span><span class="loader__count" id="loaderCount">000</span></div>
+  </div>
+
+  <!-- Navigation -->
+  <header class="nav" id="nav">
+    <a class="nav__brand" href="#top" aria-label="Evanescere — home" data-cursor="hover">
+      <svg class="nav__mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25c0-6 4-8 8-10s4-6 1-9c5 1 9 5 8 10-1 6-7 8-9 9 5-1 8-4 8-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Evanescere</span>
+    </a>
+    <nav class="nav__links" aria-label="Primary">
+      <a href="#services" data-cursor="hover">Services</a>
+      <a href="#process" data-cursor="hover">Process</a>
+      <a href="#approach" data-cursor="hover">Approach</a>
+      <a href="#faq" data-cursor="hover">FAQ</a>
+    </nav>
+    <a class="btn btn--sm nav__cta" href="#contact" data-magnetic data-cursor="hover"><span>Start a project</span></a>
+    <button class="nav__burger" id="burger" aria-expanded="false" aria-controls="menu" aria-label="Open menu"><i></i><i></i></button>
+  </header>
+
+  <div class="menu" id="menu" aria-hidden="true" inert>
+    <nav class="menu__links" aria-label="Menu">
+      <a href="#services"><span>01</span>Services</a>
+      <a href="#process"><span>02</span>Process</a>
+      <a href="#approach"><span>03</span>Approach</a>
+      <a href="#engagements"><span>04</span>Engagements</a>
+      <a href="#faq"><span>05</span>FAQ</a>
+      <a href="#contact"><span>06</span>Contact</a>
+    </nav>
+    <a class="menu__mail" href="mailto:contact@evanescere.xyz">contact@evanescere.xyz</a>
+  </div>
+
+  <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+
+  <main id="main">
+
+    <!-- HERO -->
+    <section class="hero" id="top" data-mood="hero">
+      <div class="hero__inner">
+        <p class="eyebrow reveal-up"><i class="dot"></i>Web design studio</p>
+        <h1 class="hero__title" id="heroTitle" aria-label="Design that lingers.">
+          <span class="line" data-split="chars" data-hero>Design that</span>
+          <span class="line" data-split="chars" data-hero><em>lingers.</em></span>
+        </h1>
+        <div class="hero__row">
+          <p class="hero__lede reveal-up">
+            We craft fast, striking, conversion&#8209;minded websites for brands that refuse to be forgotten. Strategy, design and code, under one roof.
+          </p>
+          <div class="hero__actions reveal-up">
+            <a class="btn" href="#contact" data-magnetic data-cursor="hover"><span>Start a project</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+            <a class="btn btn--ghost" href="#process" data-magnetic data-cursor="hover"><span>How we work</span></a>
+          </div>
+        </div>
       </div>
 
-      <div class="cta-container">
-        <a class="cta" href="mailto:contact@evanescere.xyz">Initiate Review</a>
+      <div class="hero__word" id="heroWord" aria-hidden="true">Evanescere</div>
+
+      <div class="hero__foot reveal-up">
+        <span class="scrollhint"><i></i>Scroll</span>
+        <span class="status"><i class="pulse"></i>Taking on new projects</span>
       </div>
     </section>
 
-    <footer>
-      <span>Independent & Vendor-Neutral</span>
-      <span>No Cookies · No Tracking · No Analytics · 2025</span>
-    </footer>
+    <!-- MANIFESTO -->
+    <section class="manifesto section" id="manifesto" data-mood="deep">
+      <p class="label"><span>(01)</span> The premise</p>
+      <p class="manifesto__text" data-scrub>
+        Attention is the scarcest thing a brand can earn, and the first few seconds decide everything. We design and build websites that command those seconds: clear in message, striking in form, and engineered to turn interest into enquiries.
+      </p>
+      <ul class="manifesto__pillars">
+        <li><b>Strategy&#8209;led</b><span>Every decision traces back to your goals.</span></li>
+        <li><b>Design&#8209;obsessed</b><span>Detail is not a finishing touch. It is the work.</span></li>
+        <li><b>Built to perform</b><span>Fast, accessible and found. By default.</span></li>
+      </ul>
+    </section>
+
+    <!-- THE NAME -->
+    <section class="name section" id="name" data-mood="deep">
+      <div class="name__meta">
+        <p class="label"><span>(02)</span> The name</p>
+        <p class="name__def"><span class="mono">e·va·nes·ce·re</span> <i>verb, Latin</i><br>To vanish. To fade like vapour.</p>
+      </div>
+      <h2 class="display name__title">
+        <span class="name__a" data-split="words">Everything unnecessary</span><br>
+        <span class="name__vanish" id="vanish" data-split="chars"><em>vanishes.</em></span>
+      </h2>
+      <p class="name__body" data-split="words">
+        The best websites do the same. Friction disappears. Clutter disappears. What remains is a message people understand in seconds and remember for much longer.
+      </p>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services section" id="services" data-mood="steel">
+      <div class="services__head">
+        <p class="label"><span>(03)</span> Services</p>
+        <h2 class="display" data-split="words">Everything your site needs. <em>Nothing it doesn&rsquo;t.</em></h2>
+      </div>
+
+      <ol class="svc" id="svcList">
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">01</span>
+          <h3 class="svc__title">Web Design</h3>
+          <p class="svc__desc">Art direction and interface design that make your brand unmistakable, from first impression to final click.</p>
+          <ul class="svc__tags"><li>Art direction</li><li>UI / UX</li><li>Design systems</li></ul>
+        </li>
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">02</span>
+          <h3 class="svc__title">Web Development</h3>
+          <p class="svc__desc">Hand-built sites on modern foundations. Clean code, sharp performance and room to grow.</p>
+          <ul class="svc__tags"><li>Front&#8209;end</li><li>CMS</li><li>Performance</li></ul>
+        </li>
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">03</span>
+          <h3 class="svc__title">E&#8209;commerce</h3>
+          <p class="svc__desc">Storefronts that sell. Considered product pages, effortless journeys and checkout without friction.</p>
+          <ul class="svc__tags"><li>Storefront design</li><li>Product storytelling</li><li>Conversion</li></ul>
+        </li>
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">04</span>
+          <h3 class="svc__title">Brand for Web</h3>
+          <p class="svc__desc">Identity, typography and tone shaped for the screen, so your brand speaks in one confident voice online.</p>
+          <ul class="svc__tags"><li>Visual identity</li><li>Messaging</li><li>Guidelines</li></ul>
+        </li>
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">05</span>
+          <h3 class="svc__title">Motion &amp; Interaction</h3>
+          <p class="svc__desc">Purposeful animation and interactive detail that bring pages to life and guide visitors toward action.</p>
+          <ul class="svc__tags"><li>Micro&#8209;interactions</li><li>WebGL</li><li>Scroll storytelling</li></ul>
+        </li>
+        <li class="svc__row" data-cursor="view">
+          <span class="svc__no mono">06</span>
+          <h3 class="svc__title">Growth &amp; Care</h3>
+          <p class="svc__desc">Search foundations, launch support and ongoing improvements to keep your site working as hard as you do.</p>
+          <ul class="svc__tags"><li>SEO foundations</li><li>Maintenance</li><li>Optimisation</li></ul>
+        </li>
+      </ol>
+    </section>
+
+    <!-- PROCESS (pinned horizontal on desktop) -->
+    <section class="process" id="process" data-mood="teal">
+      <div class="process__pin" id="processPin">
+        <div class="process__head">
+          <p class="label"><span>(04)</span> Process</p>
+          <h2 class="display" data-split="words">A clear path from <em>brief to launch.</em></h2>
+        </div>
+        <div class="process__track" id="processTrack">
+          <article class="step" data-step="1">
+            <span class="step__no">01</span>
+            <div class="step__body">
+              <p class="mono step__kicker">Listen</p>
+              <h3>Discover</h3>
+              <p>We start with your goals, your audience and your market. A focused conversation and some sharp research give us the brief that shapes everything after.</p>
+              <ul><li>Goals &amp; audience</li><li>Competitor review</li><li>Project brief</li></ul>
+            </div>
+          </article>
+          <article class="step" data-step="2">
+            <span class="step__no">02</span>
+            <div class="step__body">
+              <p class="mono step__kicker">Shape</p>
+              <h3>Define</h3>
+              <p>Structure, messaging and art direction take form. You see the direction, and agree it, before a single page is built.</p>
+              <ul><li>Sitemap &amp; messaging</li><li>Art direction</li><li>Moodboards</li></ul>
+            </div>
+          </article>
+          <article class="step" data-step="3">
+            <span class="step__no">03</span>
+            <div class="step__body">
+              <p class="mono step__kicker">Make</p>
+              <h3>Design &amp; Build</h3>
+              <p>Interfaces are designed, then built in clean, fast code. You review working pages at every stage, never a surprise at the end.</p>
+              <ul><li>Interface design</li><li>Motion &amp; interaction</li><li>Development</li></ul>
+            </div>
+          </article>
+          <article class="step" data-step="4">
+            <span class="step__no">04</span>
+            <div class="step__body">
+              <p class="mono step__kicker">Release</p>
+              <h3>Launch &amp; Evolve</h3>
+              <p>Rigorous testing, search set-up and a smooth go-live. Afterwards we stay close, with optional care to keep improving what we have built.</p>
+              <ul><li>Testing &amp; QA</li><li>Go-live</li><li>Handover &amp; care</li></ul>
+            </div>
+          </article>
+        </div>
+        <div class="process__bar" aria-hidden="true"><i id="processBar"></i></div>
+      </div>
+    </section>
+
+    <!-- APPROACH -->
+    <section class="approach section" id="approach" data-mood="steel">
+      <div class="approach__head">
+        <p class="label"><span>(05)</span> Approach</p>
+        <h2 class="display" data-split="words">How we <em>think.</em></h2>
+      </div>
+      <div class="approach__grid">
+        <article class="tile spot">
+          <span class="tile__no mono">A</span>
+          <h3>Clarity before cleverness</h3>
+          <p>Every page has one job. We make it obvious, then make it beautiful. Visitors should always know where they are and what to do next.</p>
+        </article>
+        <article class="tile spot">
+          <span class="tile__no mono">B</span>
+          <h3>Performance is design</h3>
+          <p>Speed, accessibility and search visibility are built into the foundations, not bolted on at the end.</p>
+        </article>
+        <article class="tile spot">
+          <span class="tile__no mono">C</span>
+          <h3>Senior attention, always</h3>
+          <p>A small studio by design. You work directly with the people designing and building your site.</p>
+        </article>
+        <article class="tile spot">
+          <span class="tile__no mono">D</span>
+          <h3>Built to be yours</h3>
+          <p>Clean handover, content you can edit and no lock-in. We want you to stay because it works, not because you have to.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ENGAGEMENTS -->
+    <section class="engage section" id="engagements" data-mood="steel">
+      <div class="engage__head">
+        <p class="label"><span>(06)</span> Engagements</p>
+        <h2 class="display" data-split="words">Ways to <em>work together.</em></h2>
+        <p class="engage__sub">Every project is scoped to its goals and quoted at a fixed price, so there are no surprises.</p>
+      </div>
+      <div class="engage__grid">
+        <article class="plan spot">
+          <p class="mono plan__kicker">For new &amp; lean businesses</p>
+          <h3>Launch</h3>
+          <p class="plan__lede">A focused, high-impact website that gets you live and looking the part.</p>
+          <ul>
+            <li>Up to five pages</li>
+            <li>Custom design</li>
+            <li>Responsive build</li>
+            <li>SEO foundations</li>
+          </ul>
+          <a class="plan__cta" href="#contact" data-pick="Launch" data-cursor="hover">Discuss Launch <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </article>
+        <article class="plan plan--feature spot">
+          <p class="mono plan__kicker">Most requested</p>
+          <h3>Studio</h3>
+          <p class="plan__lede">A complete bespoke website for brands ready to stand apart from the crowd.</p>
+          <ul>
+            <li>Strategy &amp; messaging</li>
+            <li>Bespoke design &amp; motion</li>
+            <li>CMS integration</li>
+            <li>Performance &amp; accessibility pass</li>
+            <li>Launch support</li>
+          </ul>
+          <a class="plan__cta" href="#contact" data-pick="Studio" data-cursor="hover">Discuss Studio <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </article>
+        <article class="plan spot">
+          <p class="mono plan__kicker">For growing brands</p>
+          <h3>Partner</h3>
+          <p class="plan__lede">Ongoing design and development, with a team that already knows your brand.</p>
+          <ul>
+            <li>Continuous improvement</li>
+            <li>Campaign &amp; landing pages</li>
+            <li>Priority scheduling</li>
+            <li>Care &amp; maintenance</li>
+          </ul>
+          <a class="plan__cta" href="#contact" data-pick="Partner" data-cursor="hover">Discuss Partner <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        </article>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq section" id="faq" data-mood="deep">
+      <div class="faq__head">
+        <p class="label"><span>(07)</span> Questions</p>
+        <h2 class="display" data-split="words">Good <em>questions.</em></h2>
+      </div>
+      <div class="faq__list" id="faqList">
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a1" id="q1" data-cursor="hover"><span>How long does a project take?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a1" role="region" aria-labelledby="q1"><div><p>Focused sites typically take a few weeks. Larger bespoke builds take a couple of months. We agree a clear timeline with you before we begin, and we keep to it.</p></div></div>
+        </div>
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a2" id="q2" data-cursor="hover"><span>How much does a website cost?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a2" role="region" aria-labelledby="q2"><div><p>Every project is scoped to its goals. Send us a brief and we&rsquo;ll respond with a fixed-price proposal, so you know exactly what you are investing in.</p></div></div>
+        </div>
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a3" id="q3" data-cursor="hover"><span>What do you need from us?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a3" role="region" aria-labelledby="q3"><div><p>A clear sense of your goals, your audience and any existing brand assets. We guide you through the rest, including gathering and shaping content.</p></div></div>
+        </div>
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a4" id="q4" data-cursor="hover"><span>Can I update the site myself?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a4" role="region" aria-labelledby="q4"><div><p>Yes. We can build with a content management system so your team can edit freely, or we can handle updates for you. We&rsquo;ll recommend what suits your needs.</p></div></div>
+        </div>
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a5" id="q5" data-cursor="hover"><span>Do you work with clients internationally?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a5" role="region" aria-labelledby="q5"><div><p>Yes. We are a remote-first studio and work with clients around the world.</p></div></div>
+        </div>
+        <div class="qa">
+          <h3><button class="qa__q" aria-expanded="false" aria-controls="a6" id="q6" data-cursor="hover"><span>What happens after launch?</span><i aria-hidden="true"></i></button></h3>
+          <div class="qa__a" id="a6" role="region" aria-labelledby="q6"><div><p>We hand over everything cleanly and stay available. Optional care plans cover updates, monitoring and continued improvements.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="contact section" id="contact" data-mood="violet">
+      <div class="contact__head">
+        <p class="label"><span>(08)</span> Start a project</p>
+        <h2 class="display contact__title" data-split="words">Let&rsquo;s make something <em>unforgettable.</em></h2>
+        <p class="contact__sub">Four quick questions. We&rsquo;ll come back with ideas, not a sales script.</p>
+      </div>
+
+      <form class="brief" id="brief" novalidate action="mailto:contact@evanescere.xyz" method="post" enctype="text/plain" data-endpoint="">
+        <div class="brief__top">
+          <span class="mono" id="briefCount">01 / 04</span>
+          <div class="brief__bar" aria-hidden="true"><i id="briefBar"></i></div>
+        </div>
+
+        <div class="brief__steps" id="briefSteps">
+          <fieldset class="bstep is-active" data-step="1">
+            <legend>What are we building?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="project" value="New website"><span>New website</span></label>
+              <label class="chip"><input type="radio" name="project" value="Website redesign"><span>Website redesign</span></label>
+              <label class="chip"><input type="radio" name="project" value="E-commerce store"><span>E&#8209;commerce store</span></label>
+              <label class="chip"><input type="radio" name="project" value="Brand + website"><span>Brand + website</span></label>
+              <label class="chip"><input type="radio" name="project" value="Interactive / campaign"><span>Interactive / campaign</span></label>
+              <label class="chip"><input type="radio" name="project" value="Not sure yet"><span>Not sure yet</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="bstep" data-step="2" inert>
+            <legend>What&rsquo;s the budget range?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="budget" value="Under 5k"><span>Under 5k</span></label>
+              <label class="chip"><input type="radio" name="budget" value="5k – 10k"><span>5k – 10k</span></label>
+              <label class="chip"><input type="radio" name="budget" value="10k – 25k"><span>10k – 25k</span></label>
+              <label class="chip"><input type="radio" name="budget" value="25k+"><span>25k+</span></label>
+              <label class="chip"><input type="radio" name="budget" value="Let's discuss"><span>Let&rsquo;s discuss</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="bstep" data-step="3" inert>
+            <legend>When do you want to launch?</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="timeline" value="As soon as possible"><span>As soon as possible</span></label>
+              <label class="chip"><input type="radio" name="timeline" value="1 – 3 months"><span>1 – 3 months</span></label>
+              <label class="chip"><input type="radio" name="timeline" value="3+ months"><span>3+ months</span></label>
+              <label class="chip"><input type="radio" name="timeline" value="Flexible"><span>Flexible</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="bstep" data-step="4" inert>
+            <legend>Where do we send the ideas?</legend>
+            <div class="fields">
+              <label class="field"><span>Name</span><input type="text" name="name" autocomplete="name" required placeholder="Your name"></label>
+              <label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required placeholder="you@company.com"></label>
+              <label class="field"><span>Company or website <em>(optional)</em></span><input type="text" name="company" autocomplete="organization" placeholder="Company or URL"></label>
+              <label class="field field--wide"><span>Anything we should know? <em>(optional)</em></span><textarea name="message" rows="3" placeholder="Goals, references, deadlines…"></textarea></label>
+              <label class="hp" aria-hidden="true">Leave blank<input type="text" name="_gotcha" tabindex="-1" autocomplete="off"></label>
+            </div>
+          </fieldset>
+
+          <div class="bstep bstep--done" data-step="done" inert aria-live="polite">
+            <p class="mono">Brief received</p>
+            <h3>Thank you<span id="doneName"></span>.</h3>
+            <p>We read every brief personally and will be in touch shortly. In the meantime, feel free to email us at <a href="mailto:contact@evanescere.xyz">contact@evanescere.xyz</a>.</p>
+          </div>
+        </div>
+
+        <p class="brief__error" id="briefError" role="alert"></p>
+
+        <div class="brief__nav">
+          <button type="button" class="btn btn--ghost btn--sm" id="briefBack" disabled><span>Back</span></button>
+          <button type="button" class="btn" id="briefNext" data-magnetic data-cursor="hover"><span id="briefNextLabel">Next</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </form>
+
+      <p class="contact__direct">Prefer email? <a href="mailto:contact@evanescere.xyz" data-cursor="hover">contact@evanescere.xyz</a></p>
+    </section>
   </main>
+
+  <footer class="foot" data-mood="violet">
+    <div class="foot__word" id="footWord" aria-hidden="true">Evanescere</div>
+    <div class="foot__row">
+      <span>&copy; <span id="year">2026</span> Evanescere</span>
+      <span class="foot__priv">No cookies. No tracking. No analytics.</span>
+      <a href="#top" id="toTop" data-cursor="hover">Back to top <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M4 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+  </footer>
+
+  <noscript><style>.loader{display:none!important}.reveal-up,[data-split]{opacity:1!important;transform:none!important}</style></noscript>
+
+  <script src="assets/vendor/gsap.min.js"></script>
+  <script src="assets/vendor/ScrollTrigger.min.js"></script>
+  <script src="assets/vendor/lenis.min.js"></script>
+  <script src="assets/js/smoke.js"></script>
+  <script src="assets/js/main.js"></script>
 </body>
 </html>
