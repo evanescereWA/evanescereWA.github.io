@@ -1,2 +1,2 @@
-// Runs in <head>: swap no-js for js before first paint so reveal states never flash.
-document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+// Runs before first paint: mark the page as JS-enabled so reveal states never flash.
+(function (c) { c.remove('no-js'); c.add('js'); })(document.documentElement.classList);
