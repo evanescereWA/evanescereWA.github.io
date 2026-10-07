@@ -427,6 +427,7 @@
       var op, bl;
       if (dz >= 0) { op = 1 - smooth(480, 1400, dz); bl = smooth(0, 1500, dz) * (coarse ? 9 : 16); }
       else { op = 1 - smooth(40, 500, -dz); bl = smooth(0, 500, -dz) * (coarse ? 10 : 22); }
+      if (p.key === 'foot' && dz > 0) op *= 1 - smooth(450, 760, dz);
       var sig = dz.toFixed(1) + p.fit;
       if (sig !== p.sig) {
         p.sig = sig;
@@ -454,7 +455,7 @@
           vanishSplit.chars[c].style.cssText = av <= 0 ? '' : 'opacity:' + (1 - av).toFixed(3) + ';filter:blur(' + (av * 16).toFixed(1) + 'px);transform:translate3d(' + (d[0] * av).toFixed(1) + 'px,' + (d[1] * av).toFixed(1) + 'px,0) rotate(' + (d[2] * av).toFixed(1) + 'deg)';
         }
       } else if (p.key === 'foot' && footChars.length) {
-        var fp = clamp((950 - dz) / 850, 0, 1), M = footChars.length;
+        var fp = clamp((700 - dz) / 650, 0, 1), M = footChars.length;
         for (var f = 0; f < M; f++) {
           var fa2 = clamp(fp * (M + 4) - f, 0, 1);
           footChars[f].style.cssText = fa2 >= 1 ? '' : 'opacity:' + fa2.toFixed(3) + ';filter:blur(' + ((1 - fa2) * 16).toFixed(1) + 'px);transform:translate3d(0,' + ((1 - fa2) * 55).toFixed(1) + '%,0)';
