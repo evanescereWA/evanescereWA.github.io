@@ -11,7 +11,7 @@
   var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
   var qs = (location.search.match(/[?&]q=(\w+)/) || [])[1]; // ?q=low for slow machines / testing
 
-  var API = { ok: false, setMood: function () {}, splat: function () {}, burst: function () {}, kick: function () {}, scroll: function () {}, setCamera: function () {}, setPulse: function () {} };
+  var API = { setLook: function () {}, ok: false, setMood: function () {}, splat: function () {}, burst: function () {}, kick: function () {}, scroll: function () {}, setCamera: function () {}, setPulse: function () {} };
   window.Smoke = API;
   if (!canvas) return;
 
@@ -53,7 +53,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     /* Volumetric fog. Camera travels along +z through a 3D noise field, lit from the far end. */
     fog: HEAD +
       'uniform sampler3D uNoise;uniform sampler2D uDye,uVel;\n' +
-      'uniform float time,aspect,camZ,pulse,glow,expo;uniform int uSteps;\n' +
+      'uniform float time,aspect,camZ,pulse,glow,expo;uniform vec2 look;uniform int uSteps;\n' +
       'uniform vec3 cDeep,cMid,cHigh,cLight,cBg;\n' +
       'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n' +
       'vec2 axis(float z){return vec2(sin(z*.21)*.55+sin(z*.047)*.8,cos(z*.17)*.35);}\n' +
@@ -66,7 +66,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
       'void main(){\n' +
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
-      ' vec3 rd=normalize(vec3(p+vel*.0007,1.15));\n' +
+      ' vec3 rd=normalize(vec3(p+vel*.0007+look,1.15));\n' +
       ' vec3 ro=vec3(axis(camZ),camZ);\n' +
       ' float st=.16;float t=.2+hash(gl_FragCoord.xy)*st;\n' +
       ' float T=1.;vec3 acc=vec3(0.);\n' +
@@ -255,6 +255,8 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
   var camTarget = 0, camZ = 0, pulse = 0, pulseT = 0;
   API.setCamera = function (z) { camTarget = z; };
   API.setPulse = function (p) { pulseT = p; };
+  var look = [0, 0], lookT = [0, 0];
+  API.setLook = function (x, y) { lookT[0] = x; lookT[1] = y; };
   API.scroll = function () {};
   API.kick = function () {};
 
@@ -378,6 +380,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     gl.uniform1f(u.pulse, pulse);
     gl.uniform1f(u.glow, ptr.glow);
     gl.uniform1f(u.expo, expo);
+    gl.uniform2f(u.look, look[0], look[1]);
     gl.uniform1i(u.uSteps, cfg.steps);
     gl.uniform3fv(u.cDeep, cur.deep); gl.uniform3fv(u.cMid, cur.mid); gl.uniform3fv(u.cHigh, cur.high);
     gl.uniform3fv(u.cLight, cur.light); gl.uniform3fv(u.cBg, cur.bg);
@@ -421,6 +424,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     // camera glides toward the scroll position; pulse thickens the fog while passing between scenes
     camZ += (camTarget - camZ) * Math.min(1, dt * 3.0);
     pulse += (pulseT - pulse) * Math.min(1, dt * 5.0);
+    look[0] += (lookT[0] - look[0]) * Math.min(1, dt * 3.0); look[1] += (lookT[1] - look[1]) * Math.min(1, dt * 3.0);
 
     applyPointer();
     ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.8);

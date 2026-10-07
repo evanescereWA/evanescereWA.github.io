@@ -84,60 +84,115 @@
   splits.forEach(function (s) { s.el.classList.add('is-split'); });
 
   /* ------------------------------------------------------------------
-     Tunnel DOM: wrap each section in a scene on a fixed stage
+     3D world: every section is broken into panels placed in real 3D space.
+     The camera flies forward (scroll = throttle); nothing scrolls or pans.
      ------------------------------------------------------------------ */
-  var T = { scenes: [], TR: 0, total: 0, H: 0, W: 0, cur: -1, space: null, ready: false, lastY: -1, needMeasure: false };
-  var CAM_K = 0.0042; // scroll px → world units of camera travel
+  var T = { panels: [], groups: [], stops: [], K: 1.5, lastD: 0, W: 0, H: 0, narrow: false, space: null, ready: false, lastCam: -1e9, curGroup: -1, anchors: {}, world: null, stage: null };
+  var PERSP = 1000;
+  var CAM_K = 0.0042, FOG_K = 0.0032; // scroll/world px → fog units
+  var GROUPS = [
+    { id: 'top', name: 'Intro', mood: 'hero' }, { id: 'manifesto', name: 'The premise', mood: 'deep' }, { id: 'name', name: 'The name', mood: 'deep' },
+    { id: 'services', name: 'Services', mood: 'steel' }, { id: 'process', name: 'Process', mood: 'teal' }, { id: 'approach', name: 'Approach', mood: 'steel' },
+    { id: 'engagements', name: 'Engagements', mood: 'ember' }, { id: 'faq', name: 'Questions', mood: 'deep' }, { id: 'contact', name: 'Start a project', mood: 'violet' }
+  ];
 
-  var UNIT_SEL = '.wd, .svc__row, .tile, .plan, .step, .qa, .manifesto__pillars li, .brief, .contact__sub, .contact__direct, .engage__sub, .diff__sub, .name__def, .label';
-  var SCENE_CFG = { top: { hold: 0.5 }, manifesto: { hold: 1.8 }, name: { hold: 1.5 }, services: { hold: 0.5 }, difference: { hold: 0.7 }, process: { hold: 0.5 }, approach: { hold: 0.5 }, engagements: { hold: 0.5 }, faq: { hold: 0.5 }, contact: { hold: 0.35 } };
-
-  function buildTunnel() {
-    var main = $('#main'), foot = $('.foot');
-    var stage = doc.createElement('div'); stage.className = 'stage';
-    T.space = doc.createElement('div'); T.space.className = 'scroll-space';
-    $$('main > section').forEach(function (sec, i) {
-      var scene = doc.createElement('div'); scene.className = 'scene';
-      var pan = doc.createElement('div'); pan.className = 'scene__pan';
-      sec.parentNode.removeChild(sec); pan.appendChild(sec); scene.appendChild(pan); stage.appendChild(scene);
-      var cfg = SCENE_CFG[sec.id] || { hold: 0.5 };
-      var units = i === 0 ? [] : $$(UNIT_SEL, sec).filter(function (u) { return !u.closest('.manifesto__text'); });
-      T.scenes.push({ el: scene, pan: pan, sec: sec, id: sec.id, name: sec.getAttribute('data-name') || '', mood: sec.getAttribute('data-mood') || 'hero', holdVh: cfg.hold, units: units, live: false, emerged: true, axis: 'y', panMax: 0, start: 0, end: 0, sig: '' });
+  // Where everything lives. d = depth along the flight path (world px), x/y = offset from the path.
+  // element references are cached on first use: once panels are lifted out of their containers the original selectors no longer match
+  var ELC = {};
+  function qa(sel) { return ELC[sel] || (ELC[sel] = $$(sel)); }
+  function q1(sel) { return qa(sel)[0]; }
+  function specs(W, H, n) {
+    var out = [], vw = W / 100, vh = H / 100;
+    var wide = function (f, max) { return Math.min(max, W * f); };
+    var P = function (o) { out.push(o); };
+    P({ g: 0, key: 'hero', els: [q1('#top')], full: true, d: 0, stop: 1 });
+    P({ g: 1, key: 'prem', els: [q1('#manifesto > .label'), q1('.manifesto__text')], d: 1500, y: -4 * vh, w: wide(n ? 0.9 : 0.84, 1120), stop: 1 });
+    qa('.manifesto__pillars li').forEach(function (li, i) {
+      P({ g: 1, key: 'pil' + i, els: [li], d: n ? 2050 + i * 340 : 2000 + i * 150, x: n ? 0 : (i - 1) * 0.3 * W, y: n ? 0 : (i === 1 ? 10 : 7) * vh, w: n ? wide(0.84, 420) : wide(0.24, 330), stop: n ? 1 : (i === 0 ? 1 : 0) });
     });
-    var lastPan = T.scenes[T.scenes.length - 1].pan;
-    lastPan.appendChild(foot);
+    P({ g: 2, key: 'nmeta', els: [q1('.name__meta')], d: n ? 3500 : 3300, x: n ? 0 : 0.18 * W, y: n ? -30 * vh : -29 * vh, w: n ? wide(0.9, 520) : wide(0.5, 640) });
+    P({ g: 2, key: 'ntitle', els: [q1('.name__title')], d: n ? 3500 : 3500, x: n ? 0 : -0.04 * W, y: n ? -2 * vh : -3 * vh, w: wide(n ? 0.92 : 0.86, 1200), stop: 1 });
+    P({ g: 2, key: 'nbody', els: [q1('.name__body')], d: n ? 3850 : 3780, x: n ? 0 : 0.2 * W, y: n ? 26 * vh : 27 * vh, w: n ? wide(0.88, 460) : wide(0.36, 470) });
+    P({ g: 3, key: 'shead', els: [q1('.services__head')], d: 5200, y: -2 * vh, w: wide(n ? 0.92 : 0.8, 980), stop: 1 });
+    qa('.svc__row').forEach(function (r, i) {
+      P({ g: 3, key: 'svc' + i, els: [r], d: 5900 + i * 540, x: n ? 0 : (i % 2 ? 1 : -1) * 0.235 * W, y: n ? (i % 2 ? 11 : -11) * vh : (i % 2 ? -9 : 9) * vh, w: n ? wide(0.9, 480) : wide(0.4, 540), stop: 1 });
+    });
+    P({ g: 4, key: 'phead', els: [q1('.process__head')], d: 9400, y: -2 * vh, w: wide(n ? 0.9 : 0.8, 1000), stop: 1 });
+    qa('.step').forEach(function (st, i) {
+      P({ g: 4, key: 'stp' + i, els: [st], d: 10100 + i * 640, x: n ? 0 : (i % 2 ? 1 : -1) * 0.23 * W, y: n ? (i % 2 ? 9 : -9) * vh : (i % 2 ? 7 : -7) * vh, w: n ? wide(0.9, 460) : wide(0.4, 520), stop: 1 });
+    });
+    P({ g: 5, key: 'ahead', els: [q1('.approach__head')], d: 12900, y: -2 * vh, w: wide(n ? 0.9 : 0.7, 900), stop: 1 });
+    qa('.tile').forEach(function (t, i) {
+      P({ g: 5, key: 'til' + i, els: [t], d: 13500 + i * 500, x: n ? 0 : (i % 2 ? 1 : -1) * 0.24 * W, y: n ? (i % 2 ? 10 : -10) * vh : (i % 2 ? 8 : -8) * vh, w: n ? wide(0.9, 460) : wide(0.38, 500), stop: 1 });
+    });
+    P({ g: 6, key: 'ehead', els: [q1('.engage__head')], d: 15500, y: n ? 0 : -1 * vh, w: wide(n ? 0.9 : 0.7, 900), stop: 1 });
+    qa('.plan').forEach(function (pl, i) {
+      P({ g: 6, key: 'pln' + i, els: [pl], d: n ? 16200 + i * 700 : 16200 + (i === 1 ? -80 : 0), x: n ? 0 : (i - 1) * 0.3 * W, y: n ? 0 : 0, w: n ? wide(0.9, 440) : wide(0.275, 380), stop: n ? 1 : (i === 1 ? 1 : 0) });
+    });
+    P({ g: 7, key: 'faq', els: [q1('.faq')], d: n ? 18500 : 17600, w: wide(n ? 0.94 : 0.9, 1180), stop: 1 });
+    P({ g: 8, key: 'chead', els: [q1('.contact__head'), q1('.contact__direct')], d: n ? 19500 : 19000, x: n ? 0 : -0.25 * W, y: n ? -22 * vh : -2 * vh, w: n ? wide(0.9, 520) : wide(0.36, 480), stop: 1 });
+    P({ g: 8, key: 'cform', els: [q1('.brief')], d: n ? 20000 : 19000, x: n ? 0 : 0.21 * W, y: n ? 12 * vh : 0, w: n ? wide(0.94, 560) : wide(0.5, 680), stop: 1 });
+    P({ g: 8, key: 'foot', els: [q1('.foot')], full: true, bottom: true, d: n ? 20900 : 19900, stop: 1 });
+    return out;
+  }
+
+  function buildWorld() {
+    var main = $('#main');
+    var stage = doc.createElement('div'); stage.className = 'stage';
+    var world = doc.createElement('div'); world.className = 'world';
+    stage.appendChild(world);
+    T.space = doc.createElement('div'); T.space.className = 'scroll-space';
+    var defs = specs(innerWidth, innerHeight, innerWidth < 900);
+    defs.forEach(function (sp) {
+      var el = doc.createElement('div'); el.className = 'panel' + (sp.full ? ' panel--full' : '');
+      sp.els.forEach(function (e) { if (e) { e.parentNode && e.parentNode.removeChild(e); el.appendChild(e); } });
+      world.appendChild(el);
+      var units = $$('.wd', el).filter(function (u) { return !u.closest('.manifesto__text') && !u.closest('#top'); });
+      T.panels.push({ el: el, key: sp.key, g: sp.g, units: units, vis: false, emerged: true, hit: false, sig: '', d: 0, px: 0, py: 0, fit: 1 });
+    });
     main.appendChild(stage); main.appendChild(T.space);
+    T.world = world; T.stage = stage;
     root.classList.add('tunnel');
   }
-  if (tunnelOn) buildTunnel();
+  if (tunnelOn) buildWorld();
   window.__evn = T; // debugging handle
 
-  function sceneIndexOf(el) {
-    for (var i = 0; i < T.scenes.length; i++) if (T.scenes[i].el.contains(el)) return i;
-    return -1;
+  function panelOf(el) {
+    var pe = el && el.closest ? el.closest('.panel') : null;
+    for (var i = 0; i < T.panels.length; i++) if (T.panels[i].el === pe) return T.panels[i];
+    return null;
   }
 
-  function layoutTunnel() {
-    var H = window.innerHeight, W = window.innerWidth, pos = 0;
-    T.H = H; T.W = W; T.TR = Math.max(520, H * 0.92);
-    var wide = window.matchMedia('(min-width: 900px)').matches;
-    T.scenes.forEach(function (s, i) {
-      s.axis = (s.id === 'process' && wide) ? 'x' : 'y';
-      if (s.axis === 'x') {
-        var track = $('#processTrack', s.sec), pin = $('#processPin', s.sec);
-        var pl = parseFloat(getComputedStyle(pin).paddingLeft) || 0;
-        s.panMax = Math.max(0, track.scrollWidth - (W - pl * 2));
-      } else {
-        s.panMax = Math.max(0, s.pan.offsetHeight - H);
-      }
-      s.hold = s.holdVh * H;
-      s.start = pos;
-      s.end = pos + s.hold + s.panMax;
-      pos = s.end + (i < T.scenes.length - 1 ? T.TR : 0);
+  function layoutWorld() {
+    var W = window.innerWidth, H = window.innerHeight, n = W < 900;
+    T.W = W; T.H = H; T.narrow = n;
+    // gentler speed on phones where a swipe covers a lot of ground
+    T.K = n ? 1.7 : 1.5;
+    var defs = specs(W, H, n);
+    var last = 0;
+    T.stops = []; T.anchors = {};
+    defs.forEach(function (sp, i) {
+      var p = T.panels[i], el = p.el;
+      el.style.display = 'block'; el.style.transform = 'none'; el.style.filter = ''; el.style.opacity = '';
+      if (p.key === 'cform') fitSteps();
+      if (sp.full) { el.style.width = W + 'px'; el.style.height = sp.bottom ? 'auto' : H + 'px'; }
+      else { el.style.width = (sp.w || W * 0.8) + 'px'; el.style.height = ''; }
+      var w = el.offsetWidth, h = el.offsetHeight;
+      p.w = w; p.h = h; p.sig = '';
+      p.fit = sp.full ? 1 : Math.min(1, (W * 0.94) / w, (H * 0.9) / h);
+      p.d = sp.d; p.px = sp.x || 0; p.py = sp.y || 0;
+      if (sp.bottom) p.py = (H - h) / 2;
+      el.style.display = p.vis ? 'block' : 'none';
+      if (sp.stop) T.stops.push(sp.d);
+      var g = GROUPS[sp.g];
+      if (T.anchors[g.id] === undefined) T.anchors[g.id] = sp.d;
+      last = Math.max(last, sp.d);
     });
-    T.total = pos;
-    T.space.style.height = (pos + H) + 'px';
-    T.ready = true; T.lastY = -1;
+    T.lastD = last;
+    T.stops.sort(function (a, b) { return a - b; });
+    T.space.style.height = (last / T.K + H) + 'px';
+    T.total = last / T.K;
+    T.ready = true; T.lastCam = -1e9;
   }
 
   /* ------------------------------------------------------------------
@@ -152,14 +207,22 @@
     lenis.stop();
   }
   function scrollY() { return lenis ? lenis.scroll : window.scrollY; }
+  function anchorY(el) {
+    var p = panelOf(el);
+    if (p) return p.d / T.K;
+    if (el && el.id && T.anchors[el.id] !== undefined) return T.anchors[el.id] / T.K;
+    return 0;
+  }
+  var navBusy = false;
   function goTo(target, instant) {
     var y;
     if (typeof target === 'number') y = target;
-    else if (tunnelOn) { var i = sceneIndexOf(target); y = i <= 0 ? 0 : T.scenes[i].start + 2; }
+    else if (tunnelOn) y = anchorY(target);
     else y = target.getBoundingClientRect().top + window.scrollY;
     if (lenis) {
       var dist = Math.abs(y - scrollY());
-      lenis.scrollTo(y, { duration: instant ? 0 : clamp(1.4 + dist / 5000, 1.6, 3.4), easing: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }, immediate: !!instant });
+      navBusy = true;
+      lenis.scrollTo(y, { duration: instant ? 0 : clamp(1.4 + dist / 5000, 1.6, 3.4), easing: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }, immediate: !!instant, onComplete: function () { navBusy = false; } });
     } else window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' });
   }
 
@@ -226,8 +289,8 @@
       dot.style.transform = 'translate3d(' + cx + 'px,' + cy + 'px,0)';
     });
     doc.addEventListener('mouseover', function (e) {
-      var t = e.target.closest('a, button, .chip, [data-cursor], .cmp');
-      var view = !!t && (t.getAttribute('data-cursor') === 'view' || t.classList.contains('cmp'));
+      var t = e.target.closest('a, button, .chip, [data-cursor]');
+      var view = !!t && t.getAttribute('data-cursor') === 'view';
       cursor.classList.toggle('is-hover', !!t && !view);
       cursor.classList.toggle('is-view', view);
     });
@@ -308,26 +371,24 @@
   if (!reduce) gsap.ticker.add(tickReactive);
 
   /* ------------------------------------------------------------------
-     TUNNEL: per-frame scene state
+     3D WORLD: per-frame camera + panel state
      ------------------------------------------------------------------ */
   var vanishRand = vanishSplit ? vanishSplit.chars.map(function () { return Math.random(); }) : [];
-  var vanishDir = vanishSplit ? vanishSplit.chars.map(function () { return [(Math.random() - 0.5) * 50, -30 - Math.random() * 60, (Math.random() - 0.5) * 22]; }) : [];
-  var cmpPlayed = false, cmpTween = null;
+  var vanishDir = vanishSplit ? vanishSplit.chars.map(function () { return [(Math.random() - 0.5) * 70, -30 - Math.random() * 80, (Math.random() - 0.5) * 30]; }) : [];
+  var tilt = { x: 0, y: 0, tx: 0, ty: 0, lx: 9, ly: 9 };
+  if (tunnelOn && fine && !reduce) window.addEventListener('pointermove', function (e) { tilt.tx = (e.clientX / innerWidth - 0.5) * 2; tilt.ty = -(e.clientY / innerHeight - 0.5) * 2; }, { passive: true });
 
-  function clearScene(s) {
-    s.el.classList.remove('is-live'); s.live = false;
-    s.el.style.transform = ''; s.el.style.opacity = ''; s.el.style.filter = ''; s.sig = '';
-  }
-  function emergeUnits(s, e) {
-    var N = s.units.length, i, u, a, k;
+  function emergeUnits(p, e) {
+    var N = p.units.length, i, u, a, k;
+    if (!N) return;
     if (e >= 1) {
-      if (!s.emerged) { for (i = 0; i < N; i++) { u = s.units[i]; u.classList.remove('emerging'); u.style.cssText = ''; } s.emerged = true; }
+      if (!p.emerged) { for (i = 0; i < N; i++) { u = p.units[i]; u.classList.remove('emerging'); u.style.cssText = ''; } p.emerged = true; }
       return;
     }
-    s.emerged = false;
+    p.emerged = false;
     var blurMax = coarse ? 5 : 12;
     for (i = 0; i < N; i++) {
-      u = s.units[i];
+      u = p.units[i];
       u.classList.add('emerging');
       k = (i / Math.max(1, N)) * 0.5;
       a = clamp((e - k) / 0.5, 0, 1); a = a * a * (3 - 2 * a);
@@ -335,98 +396,124 @@
     }
   }
 
-  function tunnelTick() {
+  var FAR = 1600, NEAR = 620;
+  function worldTick() {
     if (!T.ready) return;
-    var y = scrollY();
-    smoke.setCamera(y * CAM_K);
-    if (y === T.lastY) return;
-    T.lastY = y;
+    var y = scrollY(), cam = y * T.K;
+    smoke.setCamera(cam * FOG_K);
 
-    var TR = T.TR, n = T.scenes.length, cur = 0, pulse = 0, i, s;
+    // the world leans toward the pointer: depth reads as parallax
+    tilt.x += (tilt.tx - tilt.x) * 0.06; tilt.y += (tilt.ty - tilt.y) * 0.06;
+    if (Math.abs(tilt.x - tilt.lx) > 1e-4 || Math.abs(tilt.y - tilt.ly) > 1e-4) {
+      tilt.lx = tilt.x; tilt.ly = tilt.y;
+      T.world.style.transform = 'rotateX(' + (tilt.y * 2.2).toFixed(3) + 'deg) rotateY(' + (tilt.x * 3).toFixed(3) + 'deg)';
+      smoke.setLook(tilt.x * 0.07, tilt.y * 0.05);
+    }
+    if (cam === T.lastCam) return;
+    T.lastCam = cam;
+
+    var n = T.panels.length, nearest = 0, nearAbs = 1e9, i, p, dz;
     for (i = 0; i < n; i++) {
-      s = T.scenes[i];
-      var e = i === 0 ? 1 : clamp((y - (s.start - TR)) / TR, 0, 1);
-      var x = i === n - 1 ? 0 : clamp((y - s.end) / TR, 0, 1);
-      if (!(e > 0 && x < 1)) { if (s.live) clearScene(s); continue; }
-      if (!s.live) { s.el.classList.add('is-live'); s.live = true; }
-      if (e >= 0.5) cur = i;
-      if (i > 0 && e > 0 && e < 1) pulse = Math.max(pulse, Math.sin(Math.PI * e));
-
-      // flight: approach from the fog, pass the camera, dissolve behind it
-      var stable = e >= 1 && x <= 0;
-      var ee = 1 - Math.pow(1 - e, 3);
-      var sc = (0.62 + 0.38 * ee) * (1 + 1.5 * Math.pow(x, 2.1));
-      var op = smooth(0, 0.35, e) * (1 - smooth(0.3, 0.85, x));
-      var bl = (1 - e) * (1 - e) * (coarse ? 8 : 15) + Math.pow(x, 1.7) * (coarse ? 10 : 22);
-      var sig = stable ? 'S' : sc.toFixed(3) + op.toFixed(3) + bl.toFixed(1);
-      if (sig !== s.sig) {
-        s.sig = sig;
-        s.el.style.transform = stable ? '' : 'scale(' + sc.toFixed(4) + ')';
-        s.el.style.opacity = stable || op >= 0.999 ? '' : op.toFixed(3);
-        s.el.style.filter = bl < 0.1 ? '' : 'blur(' + bl.toFixed(2) + 'px)';
-        s.el.style.zIndex = x > 0 ? 20 : 10;
-        s.el.style.pointerEvents = (e >= 0.99 && x <= 0.01) ? 'auto' : 'none';
+      p = T.panels[i]; dz = p.d - cam;
+      var fa = Math.abs(dz - 150);
+      if (fa < nearAbs) { nearAbs = fa; nearest = i; }
+      if (dz > FAR || dz < -NEAR) {
+        if (p.vis) { p.el.style.display = 'none'; p.vis = false; p.sig = ''; if (p.hit) { p.el.classList.remove('is-hit'); p.hit = false; } }
+        continue;
       }
+      if (!p.vis) { p.el.style.display = 'block'; p.vis = true; }
 
-      // dwell: content pans while the camera holds
-      var local = y - s.start - s.hold * 0.35;
-      var p = s.panMax > 0 ? clamp(local / s.panMax, 0, 1) : 0;
-      if (s.axis === 'x') {
-        var tr = $('#processTrack', s.sec);
-        tr.style.transform = 'translate3d(' + (-p * s.panMax).toFixed(1) + 'px,0,0)';
-        var bar = $('#processBar'); if (bar) bar.style.transform = 'scaleX(' + p.toFixed(4) + ')';
-        var steps = $$('.step', s.sec), act = clamp(Math.round(p * (steps.length - 1)), 0, steps.length - 1);
-        if (act !== s.act) { steps.forEach(function (st, k) { st.classList.toggle('is-active', k === act); }); if (s.act !== undefined && e >= 1) smoke.burst(0.25 + Math.random() * 0.5, 0.35 + Math.random() * 0.3, 7, 1.1); s.act = act; }
-      } else {
-        s.pan.style.transform = s.panMax > 0 ? 'translate3d(0,' + (-p * s.panMax).toFixed(1) + 'px,0)' : '';
+      // depth cues: panels surface out of the fog ahead, and dissolve once they pass the camera
+      var op, bl;
+      if (dz >= 0) { op = 1 - smooth(480, 1400, dz); bl = smooth(0, 1500, dz) * (coarse ? 9 : 16); }
+      else { op = 1 - smooth(40, 500, -dz); bl = smooth(0, 500, -dz) * (coarse ? 10 : 22); }
+      var sig = dz.toFixed(1) + p.fit;
+      if (sig !== p.sig) {
+        p.sig = sig;
+        var st = p.el.style;
+        st.transform = 'translate3d(' + p.px.toFixed(1) + 'px,' + p.py.toFixed(1) + 'px,' + (-dz).toFixed(1) + 'px) translate(-50%,-50%) scale(' + p.fit.toFixed(4) + ')';
+        st.opacity = op >= 0.999 ? '' : op.toFixed(3);
+        st.filter = bl < 0.15 ? '' : 'blur(' + bl.toFixed(2) + 'px)';
       }
+      var hit = dz > -140 && dz < 460;
+      if (hit !== p.hit) { p.hit = hit; p.el.classList.toggle('is-hit', hit); }
 
-      emergeUnits(s, e);
+      emergeUnits(p, dz >= 0 ? clamp((1300 - dz) / 900, 0, 1) : 1);
 
-      // scene-specific dwell behaviour
-      if (s.id === 'manifesto' && manifestoWords.length) {
-        var pr = clamp((y - s.start - s.hold * 0.1) / (s.hold * 0.75), 0, 1), N = manifestoWords.length;
+      if (p.key === 'prem' && manifestoWords.length) {
+        var pr = clamp((780 - dz) / 780, 0, 1), N = manifestoWords.length;
         for (var w = 0; w < N; w++) {
           var a = clamp(pr * (N + 5) - w, 0, 1);
           manifestoWords[w].style.opacity = (0.14 + 0.86 * a).toFixed(3);
           if (!coarse) manifestoWords[w].style.filter = a < 1 ? 'blur(' + ((1 - a) * 5).toFixed(1) + 'px)' : '';
         }
-      }
-      if (s.id === 'name' && vanishSplit) {
-        var pv = clamp((y - s.start - s.hold * 0.4) / (s.hold * 0.55), 0, 1);
+      } else if (p.key === 'ntitle' && vanishSplit) {
+        var pv = dz < 10 ? clamp((-dz + 10) / 380, 0, 1) : 0;
         for (var c = 0; c < vanishSplit.chars.length; c++) {
-          var av = clamp((pv - vanishRand[c] * 0.65) / 0.35, 0, 1), d = vanishDir[c];
+          var av = clamp((pv - vanishRand[c] * 0.55) / 0.45, 0, 1), d = vanishDir[c];
           vanishSplit.chars[c].style.cssText = av <= 0 ? '' : 'opacity:' + (1 - av).toFixed(3) + ';filter:blur(' + (av * 16).toFixed(1) + 'px);transform:translate3d(' + (d[0] * av).toFixed(1) + 'px,' + (d[1] * av).toFixed(1) + 'px,0) rotate(' + (d[2] * av).toFixed(1) + 'deg)';
         }
+      } else if (p.key === 'foot' && footChars.length) {
+        var fp = clamp((950 - dz) / 850, 0, 1), M = footChars.length;
+        for (var f = 0; f < M; f++) {
+          var fa2 = clamp(fp * (M + 4) - f, 0, 1);
+          footChars[f].style.cssText = fa2 >= 1 ? '' : 'opacity:' + fa2.toFixed(3) + ';filter:blur(' + ((1 - fa2) * 16).toFixed(1) + 'px);transform:translate3d(0,' + ((1 - fa2) * 55).toFixed(1) + '%,0)';
+        }
       }
-      if (s.id === 'difference' && !cmpPlayed && e >= 0.9) { cmpPlayed = true; playCompare(); }
     }
 
-    heroLive = T.scenes[0].live && y < T.scenes[0].end + 4;
-    if (T.needMeasure && T.scenes[0].live && T.scenes[0].sig === 'S') { T.needMeasure = false; if (!reduce) measureReactive(); }
-    smoke.setPulse(pulse);
-    if (veil) veil.style.opacity = (pulse * 0.42).toFixed(3);
+    heroLive = cam < 60;
+    if (T.needMeasure && cam < 4) { T.needMeasure = false; if (!reduce) measureReactive(); }
 
-    if (cur !== T.cur) {
-      T.cur = cur;
-      var cs = T.scenes[cur];
-      smoke.setMood(cs.mood);
-      if (hudNo) { hudNo.textContent = pad(cur + 1) + ' / ' + pad(n); hudName.textContent = cs.name; }
+    // the fog thickens in the voids between rooms
+    var pulse = smooth(380, 1100, nearAbs) * 0.85;
+    smoke.setPulse(pulse);
+    if (veil) veil.style.opacity = (pulse * 0.4).toFixed(3);
+
+    var gi = T.panels[nearest].g;
+    if (gi !== T.curGroup) {
+      T.curGroup = gi;
+      smoke.setMood(GROUPS[gi].mood);
+      if (hudNo) { hudNo.textContent = pad(gi + 1) + ' / ' + pad(GROUPS.length); hudName.textContent = GROUPS[gi].name; }
     }
   }
 
   /* ------------------------------------------------------------------
-     Before / after
+     Navigation without scrolling: keys and idle-snap move between stops
      ------------------------------------------------------------------ */
-  var cmp = $('#cmp'), cmpRange = $('#cmpRange');
-  function setCmp(v) { cmp.style.setProperty('--pos', v + '%'); }
-  function playCompare() {
-    if (reduce || !cmp) return;
-    var o = { v: 12 };
-    cmpRange.value = 12; setCmp(12);
-    cmpTween = gsap.to(o, { v: 52, duration: 2.6, ease: 'power3.inOut', delay: 0.3, onUpdate: function () { cmpRange.value = o.v; setCmp(o.v); } });
+  var lastInput = 0, snapping = false;
+  function nextStop(dir) {
+    var cam = scrollY() * T.K, i;
+    if (dir > 0) { for (i = 0; i < T.stops.length; i++) if (T.stops[i] > cam + 60) return T.stops[i]; return T.stops[T.stops.length - 1]; }
+    for (i = T.stops.length - 1; i >= 0; i--) if (T.stops[i] < cam - 60) return T.stops[i];
+    return 0;
   }
-  if (cmp) cmpRange.addEventListener('input', function () { if (cmpTween) { cmpTween.kill(); cmpTween = null; } setCmp(cmpRange.value); });
+  if (tunnelOn) {
+    ['wheel', 'touchstart', 'pointerdown'].forEach(function (ev) { window.addEventListener(ev, function () { lastInput = performance.now(); snapping = false; navBusy = false; }, { passive: true }); });
+    doc.addEventListener('keydown', function (e) {
+      if (menuOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+      var k = e.key, dir = 0;
+      if (k === 'ArrowDown' || k === 'PageDown' || k === 'ArrowRight' || (k === ' ' && !e.shiftKey && tag !== 'button' && tag !== 'a')) dir = 1;
+      else if (k === 'ArrowUp' || k === 'PageUp' || k === 'ArrowLeft' || (k === ' ' && e.shiftKey && tag !== 'button' && tag !== 'a')) dir = -1;
+      else if (k === 'Home') { e.preventDefault(); goTo(0); return; }
+      else if (k === 'End') { e.preventDefault(); goTo(T.total); return; }
+      if (!dir) return;
+      e.preventDefault(); lastInput = performance.now();
+      goTo(nextStop(dir) / T.K);
+    });
+    // after a pause, glide to the nearest stop so you always land on something readable (mouse only)
+    if (fine && lenis) gsap.ticker.add(function () {
+      if (snapping || navBusy || menuOpen || !T.ready || performance.now() - lastInput < 380 || performance.now() - lastInput > 4000) return;
+      var cam = scrollY() * T.K, best = null, bd = 1e9;
+      for (var i = 0; i < T.stops.length; i++) { var dd = Math.abs(T.stops[i] - cam); if (dd < bd) { bd = dd; best = T.stops[i]; } }
+      lastInput = 0;
+      if (best === null || bd < 8 || bd > 520) return;
+      snapping = true;
+      lenis.scrollTo(best / T.K, { duration: 0.95, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, onComplete: function () { snapping = false; } });
+    });
+  }
 
   /* ------------------------------------------------------------------
      Classic mode: ordinary scroll with reveals
@@ -464,7 +551,6 @@
       gsap.from('.name__body', { y: 30, opacity: 0, duration: 1, ease: 'expo.out', scrollTrigger: { trigger: '.name__body', start: 'top 90%', once: true } });
     }
     gsap.from('.svc__row', { y: 50, opacity: 0, duration: 1.2, ease: 'expo.out', stagger: 0.09, clearProps: 'transform', scrollTrigger: { trigger: '#svcList', start: 'top 85%', once: true } });
-    gsap.from('.cmp', { y: 60, opacity: 0, duration: 1.3, ease: 'expo.out', scrollTrigger: { trigger: '.cmp', start: 'top 88%', once: true, onEnter: function () { if (!cmpPlayed) { cmpPlayed = true; playCompare(); } } } });
     [['.tile', '.approach__grid'], ['.plan', '.engage__grid']].forEach(function (p) {
       gsap.from(p[0], { y: 70, opacity: 0, filter: 'blur(10px)', duration: 1.3, ease: 'expo.out', stagger: 0.14, clearProps: 'filter,transform', scrollTrigger: { trigger: p[1], start: 'top 86%', once: true } });
     });
@@ -500,7 +586,7 @@
   /* ------------------------------------------------------------------
      FAQ accordion
      ------------------------------------------------------------------ */
-  function relayout() { if (tunnelOn) { layoutTunnel(); } else { ST.refresh(); } }
+  function relayout() { if (tunnelOn) { layoutWorld(); } else { ST.refresh(); } }
   $$('.qa__q').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var item = btn.closest('.qa'), open = !item.classList.contains('is-open');
@@ -613,12 +699,21 @@
      ------------------------------------------------------------------ */
   if (tunnelOn) {
     var rzT;
-    var queue = function () { clearTimeout(rzT); rzT = setTimeout(function () { layoutTunnel(); T.needMeasure = true; }, 160); };
+    var queue = function () { clearTimeout(rzT); rzT = setTimeout(function () { layoutWorld(); T.needMeasure = true; }, 160); };
     window.addEventListener('resize', queue);
-    if (window.ResizeObserver) { var ro = new ResizeObserver(queue); T.scenes.forEach(function (s) { ro.observe(s.pan); }); }
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function (entries) {
+        for (var i = 0; i < entries.length; i++) {
+          var r = entries[i].contentRect, pp = null;
+          for (var k = 0; k < T.panels.length; k++) if (T.panels[k].el === entries[i].target) { pp = T.panels[k]; break; }
+          if (pp && r.height > 0 && Math.abs(r.height - pp.h) > 3) { queue(); return; }
+        }
+      });
+      T.panels.forEach(function (p) { ro.observe(p.el); });
+    }
     if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { fitSteps(); queue(); });
     window.addEventListener('resize', fitSteps);
-    gsap.ticker.add(tunnelTick);
+    gsap.ticker.add(worldTick);
   } else {
     var rz2; window.addEventListener('resize', function () { clearTimeout(rz2); rz2 = setTimeout(function () { if (!reduce) measureReactive(); }, 200); });
   }
@@ -632,7 +727,7 @@
   function intro() {
     doc.body.classList.remove('is-loading');
     if (lenis) lenis.start();
-    if (tunnelOn) { layoutTunnel(); T.lastY = -1; tunnelTick(); } else { setupClassic(); ST.refresh(); }
+    if (tunnelOn) { layoutWorld(); worldTick(); } else { setupClassic(); ST.refresh(); }
     buildReactive();
     onScroll();
     if (reduce) { $$('.reveal-up').forEach(function (e) { e.style.opacity = 1; }); return; }
