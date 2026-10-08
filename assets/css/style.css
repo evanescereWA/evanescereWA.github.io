@@ -523,7 +523,7 @@ html:not(.tunnel) .menu__classic, html:not(.tunnel) .foot__classic { display: no
 .plan__time { color: var(--accent); margin: .1rem 0 .6rem; }
 .plan ul { margin-bottom: .4rem; }
 .foot__logo { display: flex; justify-content: center; margin: 0 0 clamp(-1.4rem, -2vw, -.5rem); position: relative; z-index: 1; }
-#logoSmoke { width: min(40vh, 400px); height: min(40vh, 400px); max-width: 80vw; touch-action: none; cursor: crosshair; }
+#logoSmoke { width: min(46vh, 460px); height: min(46vh, 460px); max-width: 80vw; touch-action: none; cursor: crosshair; }
 @media (max-width: 899px) { #logoSmoke { width: min(34vh, 320px); height: min(34vh, 320px); } }
 html:not(.tunnel) .foot__logo { margin-bottom: 0; }
 .has-cursor #logoSmoke { cursor: none; }
