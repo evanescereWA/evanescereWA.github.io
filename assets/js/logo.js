@@ -83,7 +83,7 @@
       ' vec2 g2=tx*2.;\n' +
       ' float dl=dyeAt(uv-vec2(g2.x,0.)),dr=dyeAt(uv+vec2(g2.x,0.)),dt=dyeAt(uv+vec2(0.,g2.y)),db=dyeAt(uv-vec2(0.,g2.y));\n' +
       ' vec2 g=vec2(dr-dl,dt-db);\n' +
-      ' float shade=clamp(dot(g,Ld)*3.2,-1.,1.);\n' +
+      ' float shade=clamp(dot(g,Ld)*3.8,-1.,1.);\n' +
       ' float edge=clamp(length(g)*5.,0.,1.);\n' +
       ' float t=1.-exp(-d*1.25);\n' +
       ' vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n' +
@@ -92,10 +92,10 @@
       ' col*=dark;float a=clamp(t*.92*gain,0.,1.);\n' +
       ' return vec4(col*a,a);}\n' +
       'void main(){\n' +
-      ' vec2 Ld=normalize(vec2(-.6,.8)+rot*vec2(-.9,.9));\n' +
-      ' vec4 fr=layer(vUv+rot*vec2(.06,-.05),0.,1.,1.,Ld);\n' +
-      ' vec4 md=layer(vUv,3.,.75,.82,Ld);\n' +
-      ' vec4 bk=layer(vUv-rot*vec2(.10,-.08),9.,.8,.55,Ld);\n' +
+      ' vec2 Ld=normalize(vec2(-.6,.8)+rot*vec2(-1.6,1.6));\n' +
+      ' vec4 fr=layer(vUv+rot*vec2(.07,-.055),0.,1.,1.,Ld);\n' +
+      ' vec4 md=layer(vUv-rot*vec2(.01,-.01),1.5,.5,.8,Ld);\n' +
+      ' vec4 bk=layer(vUv-rot*vec2(.08,-.065),5.,.4,.5,Ld);\n' +
       ' o=fr+(1.-fr.a)*(md+(1.-md.a)*bk);}'
   };
 
@@ -250,7 +250,7 @@
         if (sp > 1e-5) splat(p[0], p[1], dx * 2600, dy * 2600, Math.min(0.16, sp * 5), 0.0014);
       }
       last = p; inside = true;
-      rotT[0] = (p[0] - 0.5) * 2 * 0.5; rotT[1] = -(p[1] - 0.5) * 2 * 0.28;
+      rotT[0] = (p[0] - 0.5) * 2 * 0.6; rotT[1] = -(p[1] - 0.5) * 2 * 0.34;
     });
     canvas.addEventListener('pointerleave', function () { last = null; inside = false; });
     canvas.addEventListener('pointerenter', function () { inside = true; });
