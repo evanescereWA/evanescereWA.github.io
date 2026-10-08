@@ -69,17 +69,17 @@
       'vec4 nz(vec3 q){vec3 p=q*64.;vec3 i=floor(p);vec3 f=p-i;f=f*f*(3.-2.*f);return textureLod(uNoise,(i+f+.5)/64.,0.);}\n' +
       'float den(vec3 p){\n' +
       ' p+=vec3(time*.028+sin(p.z*.31+time*.05)*.35,time*.011+cos(p.z*.23+time*.04)*.25,0.);\n' +
-      ' vec3 q=p*.15;\n' +
+      ' vec3 q=p*.095;\n' +
       ' vec3 w=nz(q*.45+vec3(0.,0.,time*.010)).gba-.5;\n' +
       ' vec3 w2=nz(q*1.1+vec3(.5,.2,-time*.016)).gba-.5;\n' +
-      ' q+=w*.5+w2*.2;\n' +
-      ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(q*4.4+vec3(.61,.83,.19+time*.016)),a4=nz(q*9.3+vec3(.21,.47,.33-time*.022));\n' +
-      ' float f=a1.r*.52+a2.g*.28+a3.b*.14+a4.a*.06;\n' +
+      ' q+=w*.32+w2*.1;\n' +
+      ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(q*4.4+vec3(.61,.83,.19+time*.016));\n' +
+      ' float f=a1.r*.62+a2.g*.30+a3.b*.08;\n' +
       ' return smoothstep(.53,.88,f);}\n' +
       'void main(){\n' +
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
-      ' vec3 rd=normalize(vec3(p+vel*.0007+look+vec2(sin(p.y*2.6+time*.11),cos(p.x*2.2+time*.09))*.012+vec2(sin(p.y*7.+time*.17),cos(p.x*6.+time*.15))*.004,.95));\n' +
+      ' vec3 rd=normalize(vec3(p+vel*.0007+look+vec2(sin(p.y*2.6+time*.11),cos(p.x*2.2+time*.09))*.012+vec2(sin(p.y*7.+time*.17),cos(p.x*6.+time*.15))*.004,1.05));\n' +
       ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.025)*.25,cos(time*.02)*.15),camZ);\n' +
       ' float st=.15;float t=.2+ign(gl_FragCoord.xy,frame)*st;\n' +
       ' float T=1.;vec3 acc=vec3(0.);\n' +
@@ -152,7 +152,7 @@
     ' float R=12.;float z=fract(s.z-camZ/R-time*.002)*R+.05;\n' +
     ' vec2 xy=(s.xy*2.-1.)*vec2(aspect,1.)*(z*.95+.35);\n' +
     ' xy+=vec2(sin(time*.055+s.x*30.),cos(time*.045+s.y*30.))*.24;\n' +
-    ' vec2 p=xy/z*.95+look;\n' +
+    ' vec2 p=xy/z*1.05+look;\n' +
     ' gl_Position=vec4(p/vec2(aspect,1.)*2.,0.,1.);\n' +
     ' float near=smoothstep(.5,1.6,z),far=1.-smoothstep(6.,11.,z);\n' +
     ' vA=near*far*(.25+.75*h1(id+5.))*(1.+pulse*1.5);\n' +
@@ -540,7 +540,7 @@
 
     applyPointer();
     ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.9);
-    if (!reduceMotion) { ambient(time); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
+    if (!reduceMotion) { step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
 
     if (reduceMotion) { var moving = Math.abs(camTarget - camZ) > 1e-3 || pulse > 0.01; still = moving ? 0 : still + 1; if (still > 40) return; }
     draw(time);

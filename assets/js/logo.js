@@ -69,34 +69,7 @@
     emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.25+1.5*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
     // gentle turbulence + buoyancy around the mark keeps the smoke curling
     force: HEAD + NOISE + 'uniform sampler2D uV,uMask,uD;uniform float dt,time,amp,buoy;\nvoid main(){\n float m=texture(uMask,vUv).r;float mb=(m+texture(uMask,vUv+vec2(.03,0.)).r+texture(uMask,vUv-vec2(.03,0.)).r+texture(uMask,vUv+vec2(0.,.03)).r+texture(uMask,vUv-vec2(0.,.03)).r)*.2;\n vec2 f=vec2(n(vUv*4.5+vec2(time*.2,3.1)),n(vUv*4.5-vec2(time*.17,-8.7)))-.5;\n vec2 v=texture(uV,vUv).xy+(f*amp*mb+vec2(0.,1.)*buoy*texture(uD,vUv).r)*dt;\n o=vec4(v,0.,1.);}',
-    // The mark is drawn as three depth layers of the same silky smoke (front sharp, middle soft, back hazy) that slide
-    // against each other as you tilt, with the light moving across the relief. Depth you can feel, and the fine
-    // filaments of the flow stay perfectly crisp (no marching, no jitter, no streaks).
-    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel,rot;uniform vec3 cMid,cHigh,cLight;\n' +
-      'float dyeAt(vec2 uv){return textureLod(uDye,uv,0.).r;}\n' +
-      'float edgeF(vec2 uv){return smoothstep(0.,.1,uv.x)*smoothstep(1.,.9,uv.x)*smoothstep(0.,.1,uv.y)*smoothstep(1.,.9,uv.y);}\n' +
-      'vec4 layer(vec2 uv,float blurPx,float gain,float dark,vec2 Ld){\n' +
-      ' vec2 tx=texel;float d;\n' +
-      ' if(blurPx>0.){vec2 b=tx*blurPx;d=(dyeAt(uv)*2.+dyeAt(uv+vec2(b.x,0.))+dyeAt(uv-vec2(b.x,0.))+dyeAt(uv+vec2(0.,b.y))+dyeAt(uv-vec2(0.,b.y)))/6.;}\n' +
-      ' else d=dyeAt(uv);\n' +
-      ' d*=edgeF(uv);\n' +
-      ' vec2 g2=tx*2.;\n' +
-      ' float dl=dyeAt(uv-vec2(g2.x,0.)),dr=dyeAt(uv+vec2(g2.x,0.)),dt=dyeAt(uv+vec2(0.,g2.y)),db=dyeAt(uv-vec2(0.,g2.y));\n' +
-      ' vec2 g=vec2(dr-dl,dt-db);\n' +
-      ' float shade=clamp(dot(g,Ld)*3.8,-1.,1.);\n' +
-      ' float edge=clamp(length(g)*5.,0.,1.);\n' +
-      ' float t=1.-exp(-d*1.25);\n' +
-      ' vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n' +
-      ' vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.8);\n' +
-      ' col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n' +
-      ' col*=dark;float a=clamp(t*.92*gain,0.,1.);\n' +
-      ' return vec4(col*a,a);}\n' +
-      'void main(){\n' +
-      ' vec2 Ld=normalize(vec2(-.6,.8)+rot*vec2(-1.6,1.6));\n' +
-      ' vec4 fr=layer(vUv+rot*vec2(.07,-.055),0.,1.,1.,Ld);\n' +
-      ' vec4 md=layer(vUv-rot*vec2(.01,-.01),1.5,.5,.8,Ld);\n' +
-      ' vec4 bk=layer(vUv-rot*vec2(.08,-.065),5.,.4,.5,Ld);\n' +
-      ' o=fr+(1.-fr.a)*(md+(1.-md.a)*bk);}'
+    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float d=texture(uDye,vUv).r;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.25);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
   };
 
   function compile(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
