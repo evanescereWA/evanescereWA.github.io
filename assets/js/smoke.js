@@ -33,8 +33,8 @@
     curl: 10,
     splatRadius: 0.16,
     splatForce: 2200,
-    timeScale: 0.26,
-    fogScale: coarse ? 0.5 : 0.7,
+    timeScale: 0.21,
+    fogScale: coarse ? 0.62 : 0.85,
     steps: coarse ? 20 : 30,
     dust: coarse ? 240 : 520
   };
@@ -62,15 +62,15 @@
        accumulation) so per-pixel jitter averages away instead of reading as speckle. */
     fog: HEAD +
       'uniform sampler3D uNoise;uniform sampler2D uDye,uVel,uPrev;\n' +
-      'uniform float time,aspect,camZ,pulse,glow,expo,uDens,blend,frame;uniform vec2 look;uniform int uSteps;\n' +
+      'uniform float time,aspect,camZ,pulse,glow,expo,uDens,blend,frame,reproj;uniform vec2 look;uniform int uSteps;\n' +
       'uniform vec3 cDeep,cMid,cHigh,cLight,cBg;\n' +
       'float ign(vec2 p,float f){p+=5.588238*f;return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}\n' +
       'vec2 axis(float z){return vec2(sin(z*.21)*.55+sin(z*.047)*.8,cos(z*.17)*.35);}\n' +
       'vec4 nz(vec3 q){vec3 p=q*64.;vec3 i=floor(p);vec3 f=p-i;f=f*f*(3.-2.*f);return textureLod(uNoise,(i+f+.5)/64.,0.);}\n' +
       'float den(vec3 p){\n' +
-      ' p+=vec3(time*.016,time*.007,0.);\n' +                       // wind: the smoke drifts sideways even when nothing moves
+      ' p+=vec3(time*.028,time*.011,0.);\n' +                       // wind: the smoke drifts sideways even when nothing moves
       ' vec3 q=p*.075;\n' +
-      ' vec3 w=nz(q*.5+vec3(0.,0.,time*.0018)).gba-.5;\n' +
+      ' vec3 w=nz(q*.5+vec3(0.,0.,time*.003)).gba-.5;\n' +
       ' q+=w*.3;\n' +
       ' float f=nz(q).r*.62+nz(q*2.1+vec3(.37,.11,.71)).g*.30+nz(q*4.3+vec3(.61,.83,.19)).b*.08;\n' +
       ' return smoothstep(.53,.88,f);}\n' +
@@ -78,7 +78,7 @@
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
       ' vec3 rd=normalize(vec3(p+vel*.0007+look,1.15));\n' +
-      ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.018)*.25,cos(time*.015)*.15),camZ);\n' +
+      ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.025)*.25,cos(time*.02)*.15),camZ);\n' +
       ' float st=.15;float t=.2+ign(gl_FragCoord.xy,frame)*st;\n' +
       ' float T=1.;vec3 acc=vec3(0.);\n' +
       ' vec3 L=normalize(vec3(.18,.28,1.));\n' +
@@ -101,18 +101,27 @@
       '  t+=st;st*=1.07;}\n' +
       ' vec3 c=cBg+acc*expo;\n' +
       ' c+=cLight*exp(-dot(p,p)*.7)*(.045+.06*glow+.16*pulse)*T;\n' +
-      ' o=vec4(mix(texture(uPrev,vUv).rgb,c,blend),1.);}',
+      ' vec2 puv=.5+(vUv-.5)*(1.-reproj);\n' +
+      ' o=vec4(mix(texture(uPrev,puv).rgb,c,blend),1.);}',
 
     /* Composite at full resolution: unsharp, light shafts, content-aware density, cursor light, grain. */
     display: HEAD +
       'uniform sampler2D uFog;uniform vec2 ptr,look;uniform float time,glow,aspect,rays,pulse;uniform vec3 cLight,cMid;\n' +
       'uniform int nZ;uniform vec4 zr[6];uniform float zs[6];\n' +
       'float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n' +
+      'vec3 bicubic(vec2 uv,vec2 fs){\n' +
+      ' vec2 x=uv*fs-.5;vec2 f=fract(x);vec2 i=floor(x);\n' +
+      ' vec2 w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f);\n' +
+      ' vec2 g0=w0+w1,g1=w2+w3;\n' +
+      ' vec2 h0=(i-1.+w1/g0+.5)/fs,h1=(i+1.+w3/g1+.5)/fs;\n' +
+      ' vec3 a=texture(uFog,vec2(h0.x,h0.y)).rgb*g0.x*g0.y+texture(uFog,vec2(h1.x,h0.y)).rgb*g1.x*g0.y;\n' +
+      ' vec3 b2=texture(uFog,vec2(h0.x,h1.y)).rgb*g0.x*g1.y+texture(uFog,vec2(h1.x,h1.y)).rgb*g1.x*g1.y;\n' +
+      ' return max(a+b2,0.);}\n' +
       'void main(){\n' +
-      ' vec3 c=texture(uFog,vUv).rgb;\n' +
-      ' vec2 tx=1./vec2(textureSize(uFog,0));\n' +
+      ' vec2 fs=vec2(textureSize(uFog,0));vec2 tx=1./fs;\n' +
+      ' vec3 c=bicubic(vUv,fs);\n' +                                    // Catmull-Rom: smooth, sharp upscale
       ' vec3 b=(texture(uFog,vUv+vec2(tx.x,0.)).rgb+texture(uFog,vUv-vec2(tx.x,0.)).rgb+texture(uFog,vUv+vec2(0.,tx.y)).rgb+texture(uFog,vUv-vec2(0.,tx.y)).rgb)*.25;\n' +
-      ' c+=(c-b)*.6;\n' +                                              // crisp wisp edges
+      ' c+=(c-b)*.3;\n' +                                              // crisp wisp edges
       // crepuscular rays: the brighter fog is smeared back toward the light at the vanishing point
       ' vec2 cen=vec2(.5)+look*vec2(.45,.55);vec2 dd=(cen-vUv)*(.85/18.);vec2 uv=vUv;vec3 r=vec3(0.);float w=1.;\n' +
       ' for(int i=0;i<18;i++){uv+=dd;vec3 s=texture(uFog,uv).rgb;r+=s*smoothstep(.10,.45,dot(s,vec3(.3333)))*w;w*=.93;}\n' +
@@ -138,9 +147,9 @@
     'float h1(float n){return fract(sin(n*127.1)*43758.5453);}\n' +
     'void main(){\n' +
     ' float id=float(gl_VertexID);vec3 s=vec3(h1(id),h1(id+17.3),h1(id+41.7));\n' +
-    ' float R=12.;float z=fract(s.z-camZ/R-time*.0015)*R+.05;\n' +
+    ' float R=12.;float z=fract(s.z-camZ/R-time*.002)*R+.05;\n' +
     ' vec2 xy=(s.xy*2.-1.)*vec2(aspect,1.)*(z*.95+.35);\n' +
-    ' xy+=vec2(sin(time*.045+s.x*30.),cos(time*.036+s.y*30.))*.22;\n' +
+    ' xy+=vec2(sin(time*.055+s.x*30.),cos(time*.045+s.y*30.))*.24;\n' +
     ' vec2 p=xy/z*1.15+look;\n' +
     ' gl_Position=vec4(p/vec2(aspect,1.)*2.,0.,1.);\n' +
     ' float near=smoothstep(.5,1.6,z),far=1.-smoothstep(6.,11.,z);\n' +
@@ -366,13 +375,14 @@
     splat(ptr.x, ptr.y, dx * cfg.splatForce, dy * cfg.splatForce, Math.min(0.14, 0.02 + sp * 4));
   }
 
-  // Slow currents that enter from beyond the screen edges. Velocity only (no density), and tiny per frame:
-  // only their effect on the fog is ever visible, never where they come from.
-  function ambient(t, dt) {
-    var k = 8 * dt, p1 = t * 0.03, p2 = t * 0.023 + 2.4, p3 = t * 0.027 + 4.1;
-    splat(-0.02, 0.5 + 0.4 * Math.sin(p1 * 1.7), k * (1 + 0.5 * Math.sin(p1 * 2.3)), k * 0.3 * Math.cos(p1 * 1.3), 0);
-    splat(1.02, 0.5 + 0.4 * Math.cos(p2 * 1.4), -k * (1 + 0.5 * Math.sin(p2 * 2.1)), k * 0.3 * Math.sin(p2 * 1.1), 0);
-    splat(0.5 + 0.42 * Math.sin(p3 * 1.1 + 1), -0.02, k * 0.3 * Math.cos(p3), k * (0.8 + 0.4 * Math.sin(p3 * 2.9)), 0);
+  // The gentle currents. Every source sits just beyond a screen edge and wanders along it, so what you see is only
+  // their effect, wisps and eddies entering the frame, never a point on screen pushing the rest around.
+  function ambient(t) {
+    var p1 = t * 0.05, p2 = t * 0.037 + 2.4, p3 = t * 0.044 + 4.1, p4 = t * 0.031 + 1.2;
+    splat(-0.025, 0.5 + 0.42 * Math.sin(p1 * 1.7), 34 * (0.7 + 0.4 * Math.sin(p1 * 2.3)), 12 * Math.cos(p1 * 1.3), 0.004);          // left edge
+    splat(1.025, 0.5 + 0.42 * Math.cos(p2 * 1.4), -34 * (0.7 + 0.4 * Math.sin(p2 * 2.1)), 12 * Math.sin(p2 * 1.1), 0.004);          // right edge
+    splat(0.5 + 0.44 * Math.sin(p3 * 1.1 + 1), -0.025, 12 * Math.cos(p3), 30 * (0.7 + 0.4 * Math.sin(p3 * 2.9)), 0.003);           // bottom edge
+    splat(0.5 + 0.44 * Math.cos(p4 * 1.3), 1.025, 12 * Math.sin(p4 * 1.2), -26 * (0.7 + 0.4 * Math.sin(p4 * 2.6)), 0.003);          // top edge
   }
 
   /* ---------- Fluid step ---------- */
@@ -433,9 +443,9 @@
   }
 
   /* ---------- Render ---------- */
-  var frameNo = 0, blend = 1, blendT = 1;
+  var frameNo = 0, blend = 1, blendT = 1, lastCz = 0;
   function draw(t) {
-    var cz = camZ + (reduceMotion ? 0 : t * 0.02);
+    var cz = camZ + (reduceMotion ? 0 : t * 0.035);
     gl.disable(gl.BLEND);
     gl.useProgram(P.fog.p);
     var u = P.fog.u;
@@ -453,6 +463,7 @@
     gl.uniform1f(u.uDens, nums.dens);
     gl.uniform1f(u.blend, framesSinceReset < 3 ? 1 : blend);
     gl.uniform1f(u.frame, frameNo & 63);
+    gl.uniform1f(u.reproj, Math.max(-0.05, Math.min(0.05, (cz - lastCz) / 4.5))); lastCz = cz;
     gl.uniform2f(u.look, look[0], look[1]);
     gl.uniform1i(u.uSteps, cfg.steps);
     gl.uniform3fv(u.cDeep, cur.deep); gl.uniform3fv(u.cMid, cur.mid); gl.uniform3fv(u.cHigh, cur.high);
@@ -503,12 +514,12 @@
 
     ema += (raw - ema) * 0.05;
     if (frames > 90 && !qs) {
-      if (ema > 28) slow++; else slow = Math.max(0, slow - 1);
+      if (ema > 40) slow++; else slow = Math.max(0, slow - 1);
       if (slow > 60 && tier < 3) {
         tier++; slow = 0;
-        if (tier === 1) { cfg.fogScale *= 0.82; cfg.steps = Math.max(14, cfg.steps - 6); cfg.dust = Math.round(cfg.dust * 0.6); }
-        else if (tier === 2) { cfg.fogScale *= 0.82; cfg.steps = Math.max(12, cfg.steps - 4); cfg.simRes = Math.max(64, cfg.simRes * 0.8); }
-        else { quality = 0.75; }
+        if (tier === 1) { cfg.fogScale = Math.max(0.6, cfg.fogScale * 0.88); cfg.steps = Math.max(18, cfg.steps - 6); cfg.dust = Math.round(cfg.dust * 0.7); }
+        else if (tier === 2) { cfg.fogScale = Math.max(0.55, cfg.fogScale * 0.92); cfg.steps = Math.max(14, cfg.steps - 4); cfg.simRes = Math.max(72, cfg.simRes * 0.85); }
+        else { cfg.steps = Math.max(12, cfg.steps - 2); }
         resize(); initTargets();
       }
     }
@@ -522,12 +533,12 @@
     // temporal accumulation: heavy history at rest (clean), light while anything is moving (no ghosting)
     camSpeed = Math.abs(camTarget - lastCam) / Math.max(dt, 0.001); lastCam = camTarget;
     var active = camSpeed > 8 || pulse > 0.04 || performance.now() - ptr.lastMove < 700 || Math.abs(look[0] - lookT[0]) > 0.002;
-    blendT = active ? 0.6 : 0.12;
+    blendT = (performance.now() - ptr.lastMove < 700) ? 0.5 : (active ? 0.3 : 0.12);
     blend += (blendT - blend) * Math.min(1, dt * 6.0);
 
     applyPointer();
     ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.9);
-    if (!reduceMotion) { ambient(time, dt); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
+    if (!reduceMotion) { ambient(time); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
 
     if (reduceMotion) { var moving = Math.abs(camTarget - camZ) > 1e-3 || pulse > 0.01; still = moving ? 0 : still + 1; if (still > 40) return; }
     draw(time);

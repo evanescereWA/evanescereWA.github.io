@@ -69,42 +69,34 @@
     emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.25+1.5*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
     // gentle turbulence + buoyancy around the mark keeps the smoke curling
     force: HEAD + NOISE + 'uniform sampler2D uV,uMask,uD;uniform float dt,time,amp,buoy;\nvoid main(){\n float m=texture(uMask,vUv).r;float mb=(m+texture(uMask,vUv+vec2(.03,0.)).r+texture(uMask,vUv-vec2(.03,0.)).r+texture(uMask,vUv+vec2(0.,.03)).r+texture(uMask,vUv-vec2(0.,.03)).r)*.2;\n vec2 f=vec2(n(vUv*4.5+vec2(time*.2,3.1)),n(vUv*4.5-vec2(time*.17,-8.7)))-.5;\n vec2 v=texture(uV,vUv).xy+(f*amp*mb+vec2(0.,1.)*buoy*texture(uD,vUv).r)*dt;\n o=vec4(v,0.,1.);}',
-    // The mark is drawn as a dense stack of thin depth planes: each view ray is intersected analytically with every plane and
-    // the flow field is sampled exactly there. No marching and no jitter, so there is no noise, banding or pixelation.
-    display: HEAD + 'uniform sampler2D uDye,uVel,uNz;uniform vec2 rot;uniform float time,layers;uniform vec3 cMid,cHigh,cLight;\n' +
-      'mat3 rx(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}\n' +
-      'mat3 ry(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}\n' +
+    // The mark is drawn as three depth layers of the same silky smoke (front sharp, middle soft, back hazy) that slide
+    // against each other as you tilt, with the light moving across the relief. Depth you can feel, and the fine
+    // filaments of the flow stay perfectly crisp (no marching, no jitter, no streaks).
+    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel,rot;uniform vec3 cMid,cHigh,cLight;\n' +
+      'float dyeAt(vec2 uv){return textureLod(uDye,uv,0.).r;}\n' +
+      'float edgeF(vec2 uv){return smoothstep(0.,.1,uv.x)*smoothstep(1.,.9,uv.x)*smoothstep(0.,.1,uv.y)*smoothstep(1.,.9,uv.y);}\n' +
+      'vec4 layer(vec2 uv,float blurPx,float gain,float dark,vec2 Ld){\n' +
+      ' vec2 tx=texel;float d;\n' +
+      ' if(blurPx>0.){vec2 b=tx*blurPx;d=(dyeAt(uv)*2.+dyeAt(uv+vec2(b.x,0.))+dyeAt(uv-vec2(b.x,0.))+dyeAt(uv+vec2(0.,b.y))+dyeAt(uv-vec2(0.,b.y)))/6.;}\n' +
+      ' else d=dyeAt(uv);\n' +
+      ' d*=edgeF(uv);\n' +
+      ' vec2 g2=tx*2.;\n' +
+      ' float dl=dyeAt(uv-vec2(g2.x,0.)),dr=dyeAt(uv+vec2(g2.x,0.)),dt=dyeAt(uv+vec2(0.,g2.y)),db=dyeAt(uv-vec2(0.,g2.y));\n' +
+      ' vec2 g=vec2(dr-dl,dt-db);\n' +
+      ' float shade=clamp(dot(g,Ld)*3.2,-1.,1.);\n' +
+      ' float edge=clamp(length(g)*5.,0.,1.);\n' +
+      ' float t=1.-exp(-d*1.25);\n' +
+      ' vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n' +
+      ' vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.8);\n' +
+      ' col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n' +
+      ' col*=dark;float a=clamp(t*.92*gain,0.,1.);\n' +
+      ' return vec4(col*a,a);}\n' +
       'void main(){\n' +
-      ' vec2 p=(vUv-.5)*2.;\n' +
-      ' mat3 R=ry(rot.x)*rx(rot.y);\n' +
-      ' vec3 ro=R*vec3(0.,0.,-2.25);vec3 rd=R*normalize(vec3(p*.43,1.6));\n' +
-      ' float T=1.;vec3 acc=vec3(0.);vec3 L=normalize(vec3(-.45,.7,-.55));\n' +
-      ' float lt=.8/layers;vec2 drift=vec2(time*.02,-time*.015);\n' +
-      ' for(int i=0;i<48;i++){\n' +
-      '  if(float(i)>=layers)break;\n' +
-      '  float zk=-.4+.8*(float(i)+.5)/layers;\n' +
-      '  float t=(zk-ro.z)/rd.z;vec3 q=ro+rd*t;\n' +
-      '  vec2 uv=q.xy+.5;\n' +
-      '  float edge=smoothstep(0.,.1,uv.x)*smoothstep(1.,.9,uv.x)*smoothstep(0.,.1,uv.y)*smoothstep(1.,.9,uv.y);\n' +
-      '  if(edge<=0.)continue;\n' +
-      '  vec4 n=textureLod(uNz,uv*.7+vec2(zk*.5,zk*.35)+drift,0.);\n' +                      // 4 independent noises in one fetch
-      '  float zc=(n.g-.5)*.34,zc2=(n.b-.5)*.36;\n' +                                            // two sheets, each wandering in depth
-      '  float w0=exp(-pow((zk-zc)/.06,2.))+.8*exp(-pow((zk-zc2)/.06,2.));\n' +
-      '  if(w0<.005)continue;\n' +                                                                // early out: most planes miss both sheets
-      '  vec2 fine=(textureLod(uNz,uv*4.5+zk*2.,0.).rg-.5)*.003;\n' +                             // sub-texel filaments
-      '  float d2=textureLod(uDye,uv+fine,0.).r*edge;\n' +
-      '  if(d2<.01)continue;\n' +
-      '  float vm=length(textureLod(uVel,uv,0.).xy);\n' +
-      '  float th=.046+.03*d2+.05*smoothstep(0.,40.,vm);\n' +                                    // thin sheets: depth without sideways smear
-      '  float zp=exp(-pow((zk-zc)/th,2.))+.8*exp(-pow((zk-zc2)/th,2.));\n' +
-      '  float d=d2*zp*(.7+.6*n.r)*2.6;\n' +
-      '  if(d<.01)continue;\n' +
-      '  float dl=textureLod(uDye,uv+L.xy*.04,0.).r*(exp(-pow((zk+L.z*.04-zc)/th,2.))+.8*exp(-pow((zk+L.z*.04-zc2)/th,2.)));\n' +
-      '  float sh=exp(-dl*2.6);\n' +
-      '  float a=1.-exp(-d*lt*14.);\n' +
-      '  vec3 col=mix(cMid*.45,cMid,sh)+cHigh*sh*sh*.85+cLight*pow(1.-clamp(abs(zk)/.4,0.,1.),2.)*.12;\n' +
-      '  acc+=T*a*col;T*=1.-a;if(T<.02)break;}\n' +
-      ' o=vec4(acc,1.-T);}'
+      ' vec2 Ld=normalize(vec2(-.6,.8)+rot*vec2(-.9,.9));\n' +
+      ' vec4 fr=layer(vUv+rot*vec2(.06,-.05),0.,1.,1.,Ld);\n' +
+      ' vec4 md=layer(vUv,3.,.75,.82,Ld);\n' +
+      ' vec4 bk=layer(vUv-rot*vec2(.10,-.08),9.,.8,.55,Ld);\n' +
+      ' o=fr+(1.-fr.a)*(md+(1.-md.a)*bk);}'
   };
 
   function compile(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
@@ -183,7 +175,6 @@
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, N, N, 0, gl.RGBA, gl.FLOAT, f);
     return tex;
   }
-  var noise2D = makeNoise2D(256);
 
   function splat(x, y, dx, dy, amount, radius) {
     gl.useProgram(P.splat.p);
@@ -234,8 +225,8 @@
     var pal = window.Smoke && window.Smoke.palette && window.Smoke.palette();
     if (pal) { col.mid = pal.mid; col.high = pal.high; col.light = pal.light; }
     gl.useProgram(P.display.p);
-    gl.uniform1i(P.display.u.uDye, dye.read.attach(0)); gl.uniform1i(P.display.u.uVel, velocity.read.attach(1)); gl.uniform1i(P.display.u.uNz, 6);
-    gl.uniform2f(P.display.u.rot, rot[0], rot[1]); gl.uniform1f(P.display.u.time, time); gl.uniform1f(P.display.u.layers, stepsN);
+    gl.uniform1i(P.display.u.uDye, dye.read.attach(0)); gl.uniform2f(P.display.u.texel, dye.tx, dye.ty);
+    gl.uniform2f(P.display.u.rot, rot[0], rot[1]);
     gl.uniform3fv(P.display.u.cMid, col.mid); gl.uniform3fv(P.display.u.cHigh, col.high); gl.uniform3fv(P.display.u.cLight, col.light);
     gl.clearColor(0, 0, 0, 0);
     blit(null);
@@ -278,7 +269,7 @@
     var dt = Math.min((now - lastT) / 1000, 0.033); lastT = now;
     if (++frames % 45 === 0) fit();
     if (!reduce) { time += dt; step(Math.max(dt, 0.006) * 0.8); }
-    if (!inside) { rotT[0] = Math.sin(time * 0.27) * 0.3; rotT[1] = Math.sin(time * 0.19) * 0.1; }
+    if (!inside) { rotT[0] = Math.sin(time * 0.27) * 0.2; rotT[1] = Math.sin(time * 0.19) * 0.08; }
     rot[0] += (rotT[0] - rot[0]) * Math.min(1, dt * 4); rot[1] += (rotT[1] - rot[1]) * Math.min(1, dt * 4);
     draw();
   }
