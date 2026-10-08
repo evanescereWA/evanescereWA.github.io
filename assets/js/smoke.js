@@ -75,7 +75,7 @@
       ' q+=w*.32+w2*.1;\n' +
       ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(q*4.4+vec3(.61,.83,.19+time*.016));\n' +
       ' float f=a1.r*.62+a2.g*.30+a3.b*.08;\n' +
-      ' return smoothstep(.53,.88,f);}\n' +
+      ' return smoothstep(.56,.9,f);}\n' +
       'void main(){\n' +
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
@@ -94,15 +94,17 @@
       '  d+=dye*1.4*smoothstep(3.,.2,t);\n' +
       '  d*=uDens*(1.+pulse*.9);\n' +
       '  if(d>.004){\n' +
-      '   float dl=den(pos+L*.6)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.6-ax)),.8);\n' +
-      '   float sh=exp(-dl*2.4);\n' +
+      '   float dl=den(pos+L*.35)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.35-ax)),.8)+den(pos+L*.9)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.9-ax)),.8);\n' +
+      '   float sh=exp(-dl*1.9);\n' +
       '   float a=1.-exp(-d*st*2.6);\n' +
-      '   vec3 col=cDeep*.5+cMid*(.25+.75*sh)*.9+cHigh*sh*sh*.8;\n' +
+      '   float rim=pow(1.-clamp(d,0.,1.),2.)*sh;\n' +
+      '   vec3 col=cDeep*.16+cMid*(.03+.97*sh)*.75+cHigh*(sh*sh*1.25+rim*.55);\n' +
+      '   col*=mix(.4,1.,smoothstep(0.,.45,length(p)));\n' +
       '   acc+=T*a*col*exp(-t*.11);T*=1.-a;\n' +
       '   if(T<.03)break;}\n' +
       '  t+=st;st*=1.07;}\n' +
       ' vec3 c=cBg+acc*expo;\n' +
-      ' c+=cLight*exp(-dot(p,p)*.7)*(.045+.06*glow+.16*pulse)*T;\n' +
+      ' c+=cLight*exp(-dot(p,p)*.35)*(.012+.03*glow+.16*pulse)*T;\n' +
       ' vec2 puv=.5+(vUv-.5)*(1.-reproj);\n' +
       ' o=vec4(mix(texture(uPrev,puv).rgb,c,blend),1.);}',
 

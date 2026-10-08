@@ -30,7 +30,7 @@
     if ('filter' in x) x.filter = 'blur(' + (size * 0.0025 / s).toFixed(3) + 'px)';
     // body of the mark: bright at the crown, thinning toward the tail
     var g = x.createLinearGradient(0, 25, 0, 5);
-    g.addColorStop(0, 'rgba(255,255,255,.45)'); g.addColorStop(0.5, 'rgba(255,255,255,.9)'); g.addColorStop(1, '#fff');
+    g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(0.5, '#fff'); g.addColorStop(1, '#fff');
     x.strokeStyle = g; x.lineWidth = 1.7; x.stroke(path);
     // fainter trailing wisps rising off it: the mark is vanishing as it forms
     x.strokeStyle = 'rgba(255,255,255,.34)'; x.lineWidth = 0.9;
@@ -66,10 +66,10 @@
     grad: HEAD + 'uniform sampler2D uP,uV;\nvoid main(){float L=texture(uP,vL).x,R=texture(uP,vR).x,T=texture(uP,vT).x,B=texture(uP,vB).x;vec2 v=texture(uV,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
     clear: HEAD + 'uniform sampler2D uT;uniform float v;\nvoid main(){o=v*texture(uT,vUv);}',
     // the mark is breathed out continuously, modulated by noise so the plume is never uniform
-    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.25+1.5*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
+    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.7+1.2*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
     // gentle turbulence + buoyancy around the mark keeps the smoke curling
     force: HEAD + NOISE + 'uniform sampler2D uV,uMask,uD;uniform float dt,time,amp,buoy;\nvoid main(){\n float m=texture(uMask,vUv).r;float mb=(m+texture(uMask,vUv+vec2(.03,0.)).r+texture(uMask,vUv-vec2(.03,0.)).r+texture(uMask,vUv+vec2(0.,.03)).r+texture(uMask,vUv-vec2(0.,.03)).r)*.2;\n vec2 f=vec2(n(vUv*4.5+vec2(time*.2,3.1)),n(vUv*4.5-vec2(time*.17,-8.7)))-.5;\n vec2 v=texture(uV,vUv).xy+(f*amp*mb+vec2(0.,1.)*buoy*texture(uD,vUv).r)*dt;\n o=vec4(v,0.,1.);}',
-    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float d=texture(uDye,vUv).r;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.25);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
+    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float d=texture(uDye,vUv).r;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.45);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
   };
 
   function compile(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
