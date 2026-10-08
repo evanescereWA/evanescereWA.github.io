@@ -66,14 +66,15 @@
       'uniform vec3 cDeep,cMid,cHigh,cLight,cBg;\n' +
       'float ign(vec2 p,float f){p+=5.588238*f;return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}\n' +
       'vec2 axis(float z){return vec2(sin(z*.21)*.55+sin(z*.047)*.8,cos(z*.17)*.35);}\n' +
-      'vec4 nz(vec3 q){vec3 p=q*64.;vec3 i=floor(p);vec3 f=p-i;f=f*f*(3.-2.*f);return textureLod(uNoise,(i+f+.5)/64.,0.);}\n' +
+      'const mat3 R1=mat3(.8,.6,0.,-.6,.8,0.,0.,0.,1.),R2=mat3(.36,.48,-.8,-.8,.6,0.,.48,.64,.6),R3=mat3(.6,0.,.8,.0,1.,0.,-.8,0.,.6);\n' +
+      'vec4 nz(vec3 q){return textureLod(uNoise,q,0.);}\n' +
       'float den(vec3 p){\n' +
       ' p+=vec3(time*.028+sin(p.z*.31+time*.05)*.35,time*.011+cos(p.z*.23+time*.04)*.25,0.);\n' +
       ' vec3 q=p*.095;\n' +
-      ' vec3 w=nz(q*.45+vec3(0.,0.,time*.010)).gba-.5;\n' +
-      ' vec3 w2=nz(q*1.1+vec3(.5,.2,-time*.016)).gba-.5;\n' +
+      ' vec3 w=nz(R3*q*.45+vec3(0.,0.,time*.010)).gba-.5;\n' +
+      ' vec3 w2=nz(R1*q*1.1+vec3(.5,.2,-time*.016)).gba-.5;\n' +
       ' q+=w*.32+w2*.1;\n' +
-      ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(q*4.4+vec3(.61,.83,.19+time*.016));\n' +
+      ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(R1*q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(R2*q*4.4+vec3(.61,.83,.19+time*.016));\n' +
       ' float f=a1.r*.70+a2.g*.26+a3.b*.04;\n' +
       ' return smoothstep(.5,.76,f);}\n' +
       'void main(){\n' +
@@ -124,7 +125,7 @@
       ' vec2 fs=vec2(textureSize(uFog,0));vec2 tx=1./fs;\n' +
       ' vec3 c=bicubic(vUv,fs);\n' +                                    // Catmull-Rom: smooth, sharp upscale
       ' vec3 b=(texture(uFog,vUv+vec2(tx.x,0.)).rgb+texture(uFog,vUv-vec2(tx.x,0.)).rgb+texture(uFog,vUv+vec2(0.,tx.y)).rgb+texture(uFog,vUv-vec2(0.,tx.y)).rgb)*.25;\n' +
-      ' c+=(c-b)*.3;\n' +                                              // crisp wisp edges
+      ' c+=(c-b)*.12;\n' +                                              // crisp wisp edges
       // crepuscular rays: the brighter fog is smeared back toward the light at the vanishing point
       ' vec2 cen=vec2(.5)+look*vec2(.45,.55);vec2 dd=(cen-vUv)*(.85/18.);vec2 uv=vUv;vec3 r=vec3(0.);float w=1.;\n' +
       ' for(int i=0;i<18;i++){uv+=dd;vec3 s=texture(uFog,uv).rgb;r+=s*smoothstep(.10,.45,dot(s,vec3(.3333)))*w;w*=.93;}\n' +
@@ -259,7 +260,7 @@
     }
     var sx = ch, sy = N * ch, sz = N * N * ch;
     for (var c = 0; c < ch; c++) {
-      for (var pass = 0; pass < 2; pass++) { blurAxis(c, sx, sy, sz, 3); blurAxis(c, sy, sx, sz, 3); blurAxis(c, sz, sx, sy, 3); }
+      for (var pass = 0; pass < 2; pass++) { blurAxis(c, sx, sy, sz, 4); blurAxis(c, sy, sx, sz, 4); blurAxis(c, sz, sx, sy, 4); }
       var mean = 0, v = 0, n = N * N * N, q;
       for (q = c; q < f.length; q += ch) mean += f[q]; mean /= n;
       for (q = c; q < f.length; q += ch) v += (f[q] - mean) * (f[q] - mean);
@@ -277,7 +278,7 @@
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA16F, N, N, N, 0, gl.RGBA, gl.FLOAT, f);
     return tex;
   }
-  var noiseTex = makeNoise(64);
+  var noiseTex = makeNoise(96);
 
   /* ---------- Canvas sizing ---------- */
   var quality = 1;

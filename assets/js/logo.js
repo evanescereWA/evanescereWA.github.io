@@ -66,10 +66,10 @@
     grad: HEAD + 'uniform sampler2D uP,uV;\nvoid main(){float L=texture(uP,vL).x,R=texture(uP,vR).x,T=texture(uP,vT).x,B=texture(uP,vB).x;vec2 v=texture(uV,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
     clear: HEAD + 'uniform sampler2D uT;uniform float v;\nvoid main(){o=v*texture(uT,vUv);}',
     // the mark is breathed out continuously, modulated by noise so the plume is never uniform
-    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.7+1.2*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
+    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.7+1.2*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.7+.4*n(vUv*8.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.2),vUv)*smoothstep(vec2(1.),vec2(.8),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*30.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
     // gentle turbulence + buoyancy around the mark keeps the smoke curling
     force: HEAD + NOISE + 'uniform sampler2D uV,uMask,uD;uniform float dt,time,amp,buoy;\nvoid main(){\n float m=texture(uMask,vUv).r;float mb=(m+texture(uMask,vUv+vec2(.03,0.)).r+texture(uMask,vUv-vec2(.03,0.)).r+texture(uMask,vUv+vec2(0.,.03)).r+texture(uMask,vUv-vec2(0.,.03)).r)*.2;\n vec2 f=vec2(n(vUv*4.5+vec2(time*.2,3.1)),n(vUv*4.5-vec2(time*.17,-8.7)))-.5;\n vec2 v=texture(uV,vUv).xy+(f*amp*mb+vec2(0.,1.)*buoy*texture(uD,vUv).r)*dt;\n o=vec4(v,0.,1.);}',
-    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float d=texture(uDye,vUv).r;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.45);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
+    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float ef=smoothstep(0.,.2,vUv.x)*smoothstep(1.,.8,vUv.x)*smoothstep(0.,.2,vUv.y)*smoothstep(1.,.8,vUv.y);ef=ef*ef*(3.-2.*ef);\n float d=texture(uDye,vUv).r*ef;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.45);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.3+cHigh*edge*.04;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
   };
 
   function compile(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
@@ -171,12 +171,12 @@
     gl.useProgram(P.force.p);
     gl.uniform2f(P.force.u.texel, velocity.tx, velocity.ty);
     gl.uniform1i(P.force.u.uV, velocity.read.attach(0)); gl.uniform1i(P.force.u.uD, dye.read.attach(1)); gl.uniform1i(P.force.u.uMask, 5);
-    gl.uniform1f(P.force.u.dt, dt); gl.uniform1f(P.force.u.time, time); gl.uniform1f(P.force.u.amp, 36); gl.uniform1f(P.force.u.buoy, 9);
+    gl.uniform1f(P.force.u.dt, dt); gl.uniform1f(P.force.u.time, time); gl.uniform1f(P.force.u.amp, 12); gl.uniform1f(P.force.u.buoy, 5);
     blit(velocity.write); velocity.swap();
 
     gl.useProgram(P.curl.p); gl.uniform2f(P.curl.u.texel, velocity.tx, velocity.ty); gl.uniform1i(P.curl.u.uV, velocity.read.attach(0)); blit(curl);
     gl.useProgram(P.vort.p); gl.uniform2f(P.vort.u.texel, velocity.tx, velocity.ty);
-    gl.uniform1i(P.vort.u.uV, velocity.read.attach(0)); gl.uniform1i(P.vort.u.uC, curl.attach(1)); gl.uniform1f(P.vort.u.curl, 20); gl.uniform1f(P.vort.u.dt, dt);
+    gl.uniform1i(P.vort.u.uV, velocity.read.attach(0)); gl.uniform1i(P.vort.u.uC, curl.attach(1)); gl.uniform1f(P.vort.u.curl, 10); gl.uniform1f(P.vort.u.dt, dt);
     blit(velocity.write); velocity.swap();
     gl.useProgram(P.div.p); gl.uniform2f(P.div.u.texel, velocity.tx, velocity.ty); gl.uniform1i(P.div.u.uV, velocity.read.attach(0)); blit(divergence);
     gl.useProgram(P.clear.p); gl.uniform2f(P.clear.u.texel, velocity.tx, velocity.ty); gl.uniform1i(P.clear.u.uT, pressure.read.attach(0)); gl.uniform1f(P.clear.u.v, 0.8);
