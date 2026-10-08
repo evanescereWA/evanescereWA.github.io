@@ -244,11 +244,12 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     steel:  { deep: '#0a1226', mid: '#58769c', high: '#dbe9f9', light: '#c4dcf5', bg: '#04060a', expo: 0.7 },
     teal:   { deep: '#06161f', mid: '#4a8394', high: '#d0f0f2', light: '#aef2ea', bg: '#03070a', expo: 0.7 },
     ember:  { deep: '#170f20', mid: '#7d6c92', high: '#ffe6d2', light: '#ffc994', bg: '#05050a', expo: 0.7 },
-    violet: { deep: '#150f33', mid: '#7062a6', high: '#e5dcff', light: '#cbb4ff', bg: '#05050b', expo: 0.7 }
+    violet: { deep: '#150f33', mid: '#7062a6', high: '#e5dcff', light: '#cbb4ff', bg: '#05050b', expo: 0.5 }
   };
   var keys = ['deep', 'mid', 'high', 'light', 'bg'];
   var cur = {}, tgt = {}, expo = 0.85, expoT = 0.85;
   keys.forEach(function (k) { cur[k] = hex(moods.hero[k]); tgt[k] = cur[k].slice(); });
+  API.palette = function () { return { mid: cur.mid, high: cur.high, light: cur.light }; };
   API.setMood = function (name) { var m = moods[name]; if (!m) return; keys.forEach(function (k) { tgt[k] = hex(m[k]); }); expoT = m.expo; };
 
   /* ---------- Camera ---------- */

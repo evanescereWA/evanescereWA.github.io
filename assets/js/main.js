@@ -105,34 +105,63 @@
     var out = [], vw = W / 100, vh = H / 100;
     var wide = function (f, max) { return Math.min(max, W * f); };
     var P = function (o) { out.push(o); };
-    P({ g: 0, key: 'hero', els: [q1('#top')], full: true, d: 0, stop: 1 });
-    P({ g: 1, key: 'prem', els: [q1('#manifesto > .label'), q1('.manifesto__text')], d: 1500, y: -4 * vh, w: wide(n ? 0.9 : 0.84, 1120), stop: 1 });
+    // Rules that keep every stop clean: stops are STEP apart; everything shown together at a stop sits within ~100px of its depth
+    // (so it is razor sharp), and the neighbouring stops are far enough away to be fully hidden in the fog.
+    var STEP = 900, Z = 0;
+    var stop = function () { var d = Z; Z += STEP; return d; };
+    var head = function (g, key, sel, wd) { P({ g: g, key: key, els: [q1(sel)], d: stop(), y: -2 * vh, w: wide(n ? 0.92 : wd, 1000), stop: 1 }); };
+    // desktop: two cards per stop, side by side. narrow: one card per stop.
+    var cards = function (g, key, list, o) {
+      var per = n ? 1 : 2, i = 0;
+      while (i < list.length) {
+        var d0 = stop();
+        for (var j = 0; j < per && i + j < list.length; j++) {
+          var k = i + j;
+          P({ g: g, key: key + k, els: [list[k]], d: d0 + (j ? 70 : 0), x: n ? 0 : (j ? 1 : -1) * o.dx * W, y: n ? (k % 2 ? 1 : -1) * o.ny * vh : (j ? -1 : 1) * o.dy * vh, w: n ? wide(0.9, o.nw) : wide(o.dw, o.max), stop: j === 0 });
+        }
+        i += per;
+      }
+    };
+
+    P({ g: 0, key: 'hero', els: [q1('#top')], full: true, d: stop(), stop: 1 });
+
+    var dp = stop();
+    P({ g: 1, key: 'prem', els: [q1('#manifesto > .label'), q1('.manifesto__text')], d: dp, y: n ? -18 * vh : -15 * vh, w: wide(n ? 0.9 : 0.84, 1120), stop: 1 });
     qa('.manifesto__pillars li').forEach(function (li, i) {
-      P({ g: 1, key: 'pil' + i, els: [li], d: n ? 2050 + i * 340 : 2000 + i * 150, x: n ? 0 : (i - 1) * 0.3 * W, y: n ? 0 : (i === 1 ? 10 : 7) * vh, w: n ? wide(0.84, 420) : wide(0.24, 330), stop: n ? 1 : (i === 0 ? 1 : 0) });
+      P({ g: 1, key: 'pil' + i, els: [li], d: dp + i * 40, x: n ? 0 : (i - 1) * 0.3 * W, y: n ? (9 + i * 13) * vh : 27 * vh, w: n ? wide(0.84, 420) : wide(0.24, 330) });
     });
-    P({ g: 2, key: 'nmeta', els: [q1('.name__meta')], d: n ? 3500 : 3300, x: n ? 0 : 0.18 * W, y: n ? -30 * vh : -29 * vh, w: n ? wide(0.9, 520) : wide(0.5, 640) });
-    P({ g: 2, key: 'ntitle', els: [q1('.name__title')], d: n ? 3500 : 3500, x: n ? 0 : -0.04 * W, y: n ? -2 * vh : -3 * vh, w: wide(n ? 0.92 : 0.86, 1200), stop: 1 });
-    P({ g: 2, key: 'nbody', els: [q1('.name__body')], d: n ? 3850 : 3780, x: n ? 0 : 0.2 * W, y: n ? 26 * vh : 27 * vh, w: n ? wide(0.88, 460) : wide(0.36, 470) });
-    P({ g: 3, key: 'shead', els: [q1('.services__head')], d: 5200, y: -2 * vh, w: wide(n ? 0.92 : 0.8, 980), stop: 1 });
-    qa('.svc__row').forEach(function (r, i) {
-      P({ g: 3, key: 'svc' + i, els: [r], d: 5900 + i * 540, x: n ? 0 : (i % 2 ? 1 : -1) * 0.235 * W, y: n ? (i % 2 ? 11 : -11) * vh : (i % 2 ? -9 : 9) * vh, w: n ? wide(0.9, 480) : wide(0.4, 540), stop: 1 });
-    });
-    P({ g: 4, key: 'phead', els: [q1('.process__head')], d: 9400, y: -2 * vh, w: wide(n ? 0.9 : 0.8, 1000), stop: 1 });
-    qa('.step').forEach(function (st, i) {
-      P({ g: 4, key: 'stp' + i, els: [st], d: 10100 + i * 640, x: n ? 0 : (i % 2 ? 1 : -1) * 0.23 * W, y: n ? (i % 2 ? 9 : -9) * vh : (i % 2 ? 7 : -7) * vh, w: n ? wide(0.9, 460) : wide(0.4, 520), stop: 1 });
-    });
-    P({ g: 5, key: 'ahead', els: [q1('.approach__head')], d: 12900, y: -2 * vh, w: wide(n ? 0.9 : 0.7, 900), stop: 1 });
-    qa('.tile').forEach(function (t, i) {
-      P({ g: 5, key: 'til' + i, els: [t], d: 13500 + i * 500, x: n ? 0 : (i % 2 ? 1 : -1) * 0.24 * W, y: n ? (i % 2 ? 10 : -10) * vh : (i % 2 ? 8 : -8) * vh, w: n ? wide(0.9, 460) : wide(0.38, 500), stop: 1 });
-    });
-    P({ g: 6, key: 'ehead', els: [q1('.engage__head')], d: 15500, y: n ? 0 : -1 * vh, w: wide(n ? 0.9 : 0.7, 900), stop: 1 });
-    qa('.plan').forEach(function (pl, i) {
-      P({ g: 6, key: 'pln' + i, els: [pl], d: n ? 16200 + i * 700 : 16200 + (i === 1 ? -80 : 0), x: n ? 0 : (i - 1) * 0.3 * W, y: n ? 0 : 0, w: n ? wide(0.9, 440) : wide(0.275, 380), stop: n ? 1 : (i === 1 ? 1 : 0) });
-    });
-    P({ g: 7, key: 'faq', els: [q1('.faq')], d: n ? 18500 : 17600, w: wide(n ? 0.94 : 0.9, 1180), stop: 1 });
-    P({ g: 8, key: 'chead', els: [q1('.contact__head'), q1('.contact__direct')], d: n ? 19500 : 19000, x: n ? 0 : -0.25 * W, y: n ? -22 * vh : -2 * vh, w: n ? wide(0.9, 520) : wide(0.36, 480), stop: 1 });
-    P({ g: 8, key: 'cform', els: [q1('.brief')], d: n ? 20000 : 19000, x: n ? 0 : 0.21 * W, y: n ? 12 * vh : 0, w: n ? wide(0.94, 560) : wide(0.5, 680), stop: 1 });
-    P({ g: 8, key: 'foot', els: [q1('.foot')], full: true, bottom: true, d: n ? 20900 : 19900, stop: 1 });
+
+    var dn = stop();
+    P({ g: 2, key: 'nmeta', els: [q1('.name__meta')], d: dn + 60, x: n ? 0 : -0.04 * W, y: n ? -33 * vh : -27 * vh, w: n ? wide(0.9, 520) : wide(0.62, 760) });
+    P({ g: 2, key: 'ntitle', els: [q1('.name__title')], d: dn, x: n ? 0 : -0.04 * W, y: n ? -4 * vh : -1 * vh, w: wide(n ? 0.92 : 0.86, 1200), stop: 1 });
+    P({ g: 2, key: 'nbody', els: [q1('.name__body')], d: dn + 90, x: n ? 0 : 0.2 * W, y: n ? 27 * vh : 26 * vh, w: n ? wide(0.88, 460) : wide(0.36, 470) });
+
+    head(3, 'shead', '.services__head', 0.8);
+    cards(3, 'svc', qa('.svc__row'), { dx: 0.235, dw: 0.4, max: 540, dy: 6, ny: 8, nw: 480 });
+    head(4, 'phead', '.process__head', 0.8);
+    cards(4, 'stp', qa('.step'), { dx: 0.23, dw: 0.4, max: 520, dy: 4, ny: 9, nw: 460 });
+    head(5, 'ahead', '.approach__head', 0.7);
+    cards(5, 'til', qa('.tile'), { dx: 0.24, dw: 0.38, max: 500, dy: 6, ny: 10, nw: 460 });
+
+    head(6, 'ehead', '.engage__head', 0.7);
+    var plans = qa('.plan');
+    if (n) { plans.forEach(function (pl, i) { P({ g: 6, key: 'pln' + i, els: [pl], d: stop(), w: wide(0.9, 440), stop: 1 }); }); }
+    else {
+      var dpl = stop();
+      plans.forEach(function (pl, i) { P({ g: 6, key: 'pln' + i, els: [pl], d: dpl + (i === 1 ? 0 : 60), x: (i - 1) * 0.3 * W, y: 0, w: wide(0.275, 380), stop: i === 1 }); });
+    }
+
+    P({ g: 7, key: 'faq', els: [q1('.faq')], d: stop(), w: wide(n ? 0.94 : 0.9, 1180), stop: 1 });
+
+    if (n) {
+      P({ g: 8, key: 'chead', els: [q1('.contact__head'), q1('.contact__direct')], d: stop(), y: 0, w: wide(0.9, 520), stop: 1 });
+      P({ g: 8, key: 'cform', els: [q1('.brief')], d: stop(), y: 0, w: wide(0.94, 560), stop: 1 });
+    } else {
+      var dc = stop();
+      P({ g: 8, key: 'chead', els: [q1('.contact__head'), q1('.contact__direct')], d: dc + 50, x: -0.25 * W, y: -2 * vh, w: wide(0.36, 480) });
+      P({ g: 8, key: 'cform', els: [q1('.brief')], d: dc, x: 0.21 * W, w: wide(0.5, 680), stop: 1 });
+    }
+    P({ g: 8, key: 'foot', els: [q1('.foot')], full: true, bottom: true, d: stop(), stop: 1 });
     return out;
   }
 
@@ -179,13 +208,13 @@
       else { el.style.width = (sp.w || W * 0.8) + 'px'; el.style.height = ''; }
       var w = el.offsetWidth, h = el.offsetHeight;
       p.w = w; p.h = h; p.sig = '';
-      p.fit = sp.full ? 1 : Math.min(1, (W * 0.94) / w, (H * 0.9) / h);
+      p.fit = (sp.full && !sp.bottom) ? 1 : Math.min(1, (W * 0.94) / w, (H * 0.9) / h);
       p.d = sp.d; p.px = sp.x || 0; p.py = sp.y || 0;
-      if (sp.bottom) p.py = (H - h) / 2;
+      if (sp.bottom) p.py = (H - h * p.fit) / 2;
       el.style.display = p.vis ? 'block' : 'none';
       if (sp.stop) T.stops.push(sp.d);
       var g = GROUPS[sp.g];
-      if (T.anchors[g.id] === undefined) T.anchors[g.id] = sp.d;
+      if (sp.stop && T.anchors[g.id] === undefined) T.anchors[g.id] = sp.d;
       last = Math.max(last, sp.d);
     });
     T.lastD = last;
@@ -396,7 +425,7 @@
     }
   }
 
-  var FAR = 1600, NEAR = 620;
+  var FAR = 900, NEAR = 620;
   function worldTick() {
     if (!T.ready) return;
     var y = scrollY(), cam = y * T.K;
@@ -415,7 +444,8 @@
     var n = T.panels.length, nearest = 0, nearAbs = 1e9, i, p, dz;
     for (i = 0; i < n; i++) {
       p = T.panels[i]; dz = p.d - cam;
-      var fa = Math.abs(dz - 150);
+      if (p.key === 'foot' && window.Logo) window.Logo.setActive(dz < 1100 && dz > -300);
+      var fa = Math.abs(dz);
       if (fa < nearAbs) { nearAbs = fa; nearest = i; }
       if (dz > FAR || dz < -NEAR) {
         if (p.vis) { p.el.style.display = 'none'; p.vis = false; p.sig = ''; if (p.hit) { p.el.classList.remove('is-hit'); p.hit = false; } }
@@ -425,9 +455,8 @@
 
       // depth cues: panels surface out of the fog ahead, and dissolve once they pass the camera
       var op, bl;
-      if (dz >= 0) { op = 1 - smooth(480, 1400, dz); bl = smooth(0, 1500, dz) * (coarse ? 9 : 16); }
-      else { op = 1 - smooth(40, 500, -dz); bl = smooth(0, 500, -dz) * (coarse ? 10 : 22); }
-      if (p.key === 'foot' && dz > 0) op *= 1 - smooth(450, 760, dz);
+      if (dz >= 0) { op = 1 - smooth(260, 800, dz); bl = smooth(120, 800, dz) * (coarse ? 9 : 16); }
+      else { op = 1 - smooth(40, 480, -dz); bl = smooth(30, 480, -dz) * (coarse ? 10 : 22); }
       var sig = dz.toFixed(1) + p.fit;
       if (sig !== p.sig) {
         p.sig = sig;
@@ -439,23 +468,23 @@
       var hit = dz > -140 && dz < 460;
       if (hit !== p.hit) { p.hit = hit; p.el.classList.toggle('is-hit', hit); }
 
-      emergeUnits(p, dz >= 0 ? clamp((1300 - dz) / 900, 0, 1) : 1);
+      emergeUnits(p, dz >= 0 ? clamp((820 - dz) / 620, 0, 1) : 1);
 
       if (p.key === 'prem' && manifestoWords.length) {
-        var pr = clamp((780 - dz) / 780, 0, 1), N = manifestoWords.length;
+        var pr = clamp((560 - dz) / 560, 0, 1), N = manifestoWords.length;
         for (var w = 0; w < N; w++) {
           var a = clamp(pr * (N + 5) - w, 0, 1);
           manifestoWords[w].style.opacity = (0.14 + 0.86 * a).toFixed(3);
           if (!coarse) manifestoWords[w].style.filter = a < 1 ? 'blur(' + ((1 - a) * 5).toFixed(1) + 'px)' : '';
         }
       } else if (p.key === 'ntitle' && vanishSplit) {
-        var pv = dz < 10 ? clamp((-dz + 10) / 380, 0, 1) : 0;
+        var pv = dz < -20 ? clamp((-dz - 20) / 380, 0, 1) : 0;
         for (var c = 0; c < vanishSplit.chars.length; c++) {
           var av = clamp((pv - vanishRand[c] * 0.55) / 0.45, 0, 1), d = vanishDir[c];
           vanishSplit.chars[c].style.cssText = av <= 0 ? '' : 'opacity:' + (1 - av).toFixed(3) + ';filter:blur(' + (av * 16).toFixed(1) + 'px);transform:translate3d(' + (d[0] * av).toFixed(1) + 'px,' + (d[1] * av).toFixed(1) + 'px,0) rotate(' + (d[2] * av).toFixed(1) + 'deg)';
         }
       } else if (p.key === 'foot' && footChars.length) {
-        var fp = clamp((700 - dz) / 650, 0, 1), M = footChars.length;
+        var fp = clamp((560 - dz) / 520, 0, 1), M = footChars.length;
         for (var f = 0; f < M; f++) {
           var fa2 = clamp(fp * (M + 4) - f, 0, 1);
           footChars[f].style.cssText = fa2 >= 1 ? '' : 'opacity:' + fa2.toFixed(3) + ';filter:blur(' + ((1 - fa2) * 16).toFixed(1) + 'px);transform:translate3d(0,' + ((1 - fa2) * 55).toFixed(1) + '%,0)';
@@ -467,7 +496,7 @@
     if (T.needMeasure && cam < 4) { T.needMeasure = false; if (!reduce) measureReactive(); }
 
     // the fog thickens in the voids between rooms
-    var pulse = smooth(380, 1100, nearAbs) * 0.85;
+    var pulse = smooth(110, 430, nearAbs) * 0.85;
     smoke.setPulse(pulse);
     if (veil) veil.style.opacity = (pulse * 0.4).toFixed(3);
 
@@ -480,9 +509,10 @@
   }
 
   /* ------------------------------------------------------------------
-     Navigation without scrolling: keys and idle-snap move between stops
+     Navigation without scrolling. There is no resting place between stops:
+     whenever movement ends, the camera glides to a stop (on every device).
      ------------------------------------------------------------------ */
-  var lastInput = 0, snapping = false;
+  var snapping = false, touching = false, lastMoveT = 0, lastSy = 0, moveDir = 1;
   function nextStop(dir) {
     var cam = scrollY() * T.K, i;
     if (dir > 0) { for (i = 0; i < T.stops.length; i++) if (T.stops[i] > cam + 60) return T.stops[i]; return T.stops[T.stops.length - 1]; }
@@ -490,7 +520,9 @@
     return 0;
   }
   if (tunnelOn) {
-    ['wheel', 'touchstart', 'pointerdown'].forEach(function (ev) { window.addEventListener(ev, function () { lastInput = performance.now(); snapping = false; navBusy = false; }, { passive: true }); });
+    window.addEventListener('touchstart', function () { touching = true; snapping = false; navBusy = false; }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) { window.addEventListener(ev, function () { touching = false; lastMoveT = performance.now(); }, { passive: true }); });
+    window.addEventListener('wheel', function () { snapping = false; navBusy = false; }, { passive: true });
     doc.addEventListener('keydown', function (e) {
       if (menuOpen || e.metaKey || e.ctrlKey || e.altKey) return;
       var tag = (e.target.tagName || '').toLowerCase();
@@ -501,18 +533,22 @@
       else if (k === 'Home') { e.preventDefault(); goTo(0); return; }
       else if (k === 'End') { e.preventDefault(); goTo(T.total); return; }
       if (!dir) return;
-      e.preventDefault(); lastInput = performance.now();
+      e.preventDefault();
       goTo(nextStop(dir) / T.K);
     });
-    // after a pause, glide to the nearest stop so you always land on something readable (mouse only)
-    if (fine && lenis) gsap.ticker.add(function () {
-      if (snapping || navBusy || menuOpen || !T.ready || performance.now() - lastInput < 380 || performance.now() - lastInput > 4000) return;
-      var cam = scrollY() * T.K, best = null, bd = 1e9;
-      for (var i = 0; i < T.stops.length; i++) { var dd = Math.abs(T.stops[i] - cam); if (dd < bd) { bd = dd; best = T.stops[i]; } }
-      lastInput = 0;
-      if (best === null || bd < 8 || bd > 520) return;
+    gsap.ticker.add(function () {
+      if (!T.ready) return;
+      var now = performance.now(), sy = scrollY();
+      if (Math.abs(sy - lastSy) > 0.4) { moveDir = sy > lastSy ? 1 : -1; lastSy = sy; if (!snapping && !navBusy) lastMoveT = now; }
+      if (snapping || navBusy || touching || menuOpen || now - lastMoveT < 150) return;
+      var cam = sy * T.K, a = 0, b = T.stops[T.stops.length - 1], i;
+      for (i = 0; i < T.stops.length; i++) { if (T.stops[i] <= cam + 0.5) a = T.stops[i]; else { b = T.stops[i]; break; } }
+      if (cam - a < 6 || b - cam < 6 || b <= a) return;
+      var frac = (cam - a) / (b - a);
+      var target = moveDir > 0 ? (frac > 0.07 ? b : a) : (frac < 0.93 ? a : b);
       snapping = true;
-      lenis.scrollTo(best / T.K, { duration: 0.95, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, onComplete: function () { snapping = false; } });
+      if (lenis) lenis.scrollTo(target / T.K, { duration: 0.9, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, onComplete: function () { snapping = false; lastSy = scrollY(); } });
+      else { window.scrollTo({ top: target / T.K, behavior: 'smooth' }); setTimeout(function () { snapping = false; }, 900); }
     });
   }
 
@@ -520,6 +556,8 @@
      Classic mode: ordinary scroll with reveals
      ------------------------------------------------------------------ */
   function setupClassic() {
+    var lg = $('#logoSmoke');
+    if (lg && window.Logo && 'IntersectionObserver' in window) new IntersectionObserver(function (en) { window.Logo.setActive(en[0].isIntersecting); }, { rootMargin: '200px' }).observe(lg);
     $$('[data-mood]').forEach(function (sec) {
       ST.create({ trigger: sec, start: 'top 55%', end: 'bottom 55%', onToggle: function (s) { if (s.isActive) smoke.setMood(sec.getAttribute('data-mood')); } });
     });
