@@ -1,5 +1,6 @@
-/* Evanescere — the mark, made of smoke
-   A dedicated high-resolution fluid simulation (WebGL2). The brand mark is emitted continuously as
+/* Evanescere — the mark, made of smoke (3D)
+   A dedicated high-resolution fluid simulation (WebGL2), rendered as a thick volume you can look around:
+   the 2D flow drives the density, the renderer ray-marches it as a slab with depth, light and parallax. The brand mark is emitted continuously as
    smoke, so it holds its shape the way a candle's plume does: alive, drifting, never static.
    Move across it and the smoke tears, curls and slowly pulls itself back together.
    Exposes window.Logo.setActive(bool): the simulation only runs while the mark is on screen. */
@@ -48,7 +49,7 @@
   }
 
   var SIM = coarse ? 128 : 192;
-  var DYE = qs === 'low' ? 384 : (coarse ? 640 : 1024);
+  var DYE = qs === 'low' ? 384 : (qs === 'mid' ? 640 : (coarse ? 640 : 1024));
   var ITERS = coarse ? 14 : 20;
 
   var VS = '#version 300 es\nprecision highp float;\nin vec2 aPos;\nout vec2 vUv,vL,vR,vT,vB;\nuniform vec2 texel;\nvoid main(){vUv=aPos*.5+.5;vL=vUv-vec2(texel.x,0.);vR=vUv+vec2(texel.x,0.);vT=vUv+vec2(0.,texel.y);vB=vUv-vec2(0.,texel.y);gl_Position=vec4(aPos,0.,1.);}';
@@ -65,10 +66,44 @@
     grad: HEAD + 'uniform sampler2D uP,uV;\nvoid main(){float L=texture(uP,vL).x,R=texture(uP,vR).x,T=texture(uP,vT).x,B=texture(uP,vB).x;vec2 v=texture(uV,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
     clear: HEAD + 'uniform sampler2D uT;uniform float v;\nvoid main(){o=v*texture(uT,vUv);}',
     // the mark is breathed out continuously, modulated by noise so the plume is never uniform
-    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.25+1.5*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));o=vec4(texture(uT,vUv).rgb+vec3(m*rate*dt*nz,0.,0.),1.);}',
+    emit: HEAD + NOISE + 'uniform sampler2D uT,uMask;uniform float dt,rate,time;\nvoid main(){float m=texture(uMask,vUv).r;float nz=.25+1.5*smoothstep(.2,.8,n(vUv*7.+vec2(0.,-time*.22)))*(.5+.8*n(vUv*17.+vec2(time*.1,-time*.3)+4.));vec2 e2=smoothstep(vec2(0.),vec2(.1),vUv)*smoothstep(vec2(1.),vec2(.9),vUv);float edge=e2.x*e2.y;vec3 base=texture(uT,vUv).rgb*mix(1.,edge,min(1.,dt*14.));o=vec4(base+vec3(m*rate*dt*nz,0.,0.),1.);}',
     // gentle turbulence + buoyancy around the mark keeps the smoke curling
     force: HEAD + NOISE + 'uniform sampler2D uV,uMask,uD;uniform float dt,time,amp,buoy;\nvoid main(){\n float m=texture(uMask,vUv).r;float mb=(m+texture(uMask,vUv+vec2(.03,0.)).r+texture(uMask,vUv-vec2(.03,0.)).r+texture(uMask,vUv+vec2(0.,.03)).r+texture(uMask,vUv-vec2(0.,.03)).r)*.2;\n vec2 f=vec2(n(vUv*4.5+vec2(time*.2,3.1)),n(vUv*4.5-vec2(time*.17,-8.7)))-.5;\n vec2 v=texture(uV,vUv).xy+(f*amp*mb+vec2(0.,1.)*buoy*texture(uD,vUv).r)*dt;\n o=vec4(v,0.,1.);}',
-    display: HEAD + 'uniform sampler2D uDye;uniform vec2 texel;uniform vec3 cMid,cHigh,cLight;\nvoid main(){\n float d=texture(uDye,vUv).r;\n vec2 tx=texel*3.2;\n float dl=texture(uDye,vUv-vec2(tx.x,0.)).r,dr=texture(uDye,vUv+vec2(tx.x,0.)).r,dt=texture(uDye,vUv+vec2(0.,tx.y)).r,db=texture(uDye,vUv-vec2(0.,tx.y)).r;\n vec2 g=vec2(dr-dl,dt-db);\n float shade=clamp((-g.x*.6+g.y*.8)*2.2,-1.,1.);\n float edge=clamp(length(g)*5.,0.,1.);\n float hz=0.;for(int i=0;i<8;i++){float a=float(i)*.785398;hz+=texture(uDye,vUv+vec2(cos(a),sin(a))*texel*12.).r;}hz*=.125;\n float t=1.-exp(-d*1.25);\n vec3 body=mix(cMid*.55,cMid,smoothstep(0.,.6,t));\n vec3 col=mix(body,cHigh,smoothstep(.15,.85,t)*.95);\n col+=cLight*max(shade,0.)*.55+cHigh*edge*.08;\n float a=clamp(t*.9+(1.-exp(-hz*2.2))*.16,0.,1.);\n o=vec4(col*a,a);}'
+    display: HEAD + 'uniform sampler2D uDye,uVel;uniform vec2 rot;uniform float time,steps,frm;uniform vec3 cMid,cHigh,cLight;\n' +
+      'float hs(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}\n' +
+      'float vn(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hs(i),hs(i+vec3(1,0,0)),f.x),mix(hs(i+vec3(0,1,0)),hs(i+vec3(1,1,0)),f.x),f.y),mix(mix(hs(i+vec3(0,0,1)),hs(i+vec3(1,0,1)),f.x),mix(hs(i+vec3(0,1,1)),hs(i+vec3(1,1,1)),f.x),f.y),f.z);}\n' +
+      'mat3 rx(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}\n' +
+      'mat3 ry(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}\n' +
+      'void main(){\n' +
+      ' vec2 p=(vUv-.5)*2.;\n' +
+      ' mat3 R=ry(rot.x)*rx(rot.y);\n' +
+      ' vec3 ro=R*vec3(0.,0.,-2.25);vec3 rd=R*normalize(vec3(p*.43,1.6));\n' +
+      ' vec3 bmin=vec3(-.62,-.62,-.42),bmax=vec3(.62,.62,.42);\n' +
+      ' vec3 inv=1./rd;vec3 t0=(bmin-ro)*inv,t1=(bmax-ro)*inv;vec3 tmn=min(t0,t1),tmx=max(t0,t1);\n' +
+      ' float tn=max(max(tmn.x,tmn.y),tmn.z),tf=min(min(tmx.x,tmx.y),tmx.z);\n' +
+      ' if(tf<=max(tn,0.)){o=vec4(0.);return;}\n' +
+      ' float dt=(tf-tn)/steps;float t=tn+dt*fract(52.9829189*fract(dot(gl_FragCoord.xy+5.588238*frm,vec2(.06711056,.00583715))));\n' +
+      ' float T=1.;vec3 acc=vec3(0.);vec3 L=normalize(vec3(-.45,.7,-.55));\n' +
+      ' for(int i=0;i<48;i++){\n' +
+      '  if(float(i)>=steps)break;\n' +
+      '  vec3 q=ro+rd*t;vec2 uv=q.xy+.5;\n' +
+      '  float edge=smoothstep(0.,.1,uv.x)*smoothstep(1.,.9,uv.x)*smoothstep(0.,.1,uv.y)*smoothstep(1.,.9,uv.y);\n' +
+      '  float d2=textureLod(uDye,uv,0.).r*edge;\n' +
+      '  if(d2>.012){\n' +
+      '   float vm=length(textureLod(uVel,uv,0.).xy);\n' +
+      '   float nzv=vn(q*3.4+vec3(0.,time*.14,time*.07));\n' +
+      '   float zc=(nzv-.5)*.34;float zc2=(vn(q*2.6+vec3(7.,time*.1,3.))-.5)*.36;\n' +  // two thin sheets, each drifting in depth
+      '   float th=.03+.03*d2+.05*smoothstep(0.,40.,vm);\n' +                     // thin: depth without sideways smear. disturbed smoke puffs toward the viewer
+      '   float zp=exp(-pow((q.z-zc)/th,2.))+.8*exp(-pow((q.z-zc2)/th,2.));\n' +
+      '   float d=d2*zp*(.7+.6*nzv)*3.8;\n' +
+      '   if(d>.01){\n' +
+      '    float dl=textureLod(uDye,uv+L.xy*.045,0.).r*(exp(-pow((q.z+L.z*.045-zc)/th,2.))+.8*exp(-pow((q.z+L.z*.045-zc2)/th,2.)));\n' +
+      '    float sh=exp(-dl*2.6);\n' +
+      '    float a=1.-exp(-d*dt*6.);\n' +
+      '    vec3 col=mix(cMid*.45,cMid,sh)+cHigh*sh*sh*.85+cLight*pow(1.-clamp(abs(q.z)/.4,0.,1.),2.)*.12;\n' +
+      '    acc+=T*a*col;T*=1.-a;if(T<.02)break;}}\n' +
+      '  t+=dt;}\n' +
+      ' o=vec4(acc,1.-T);}'
   };
 
   function compile(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn(gl.getShaderInfoLog(s)); return null; } return s; }
@@ -164,11 +199,13 @@
   }
 
   var col = { mid: [0.44, 0.38, 0.65], high: [0.9, 0.86, 1.0], light: [0.8, 0.7, 1.0] };
+  var rot = [0, 0], rotT = [0, 0], inside = false, stepsN = qs === 'low' ? 22 : (qs === 'mid' ? 34 : (coarse ? 26 : 44));
   function draw() {
     var pal = window.Smoke && window.Smoke.palette && window.Smoke.palette();
     if (pal) { col.mid = pal.mid; col.high = pal.high; col.light = pal.light; }
     gl.useProgram(P.display.p);
-    gl.uniform1i(P.display.u.uDye, dye.read.attach(0)); gl.uniform2f(P.display.u.texel, dye.tx, dye.ty);
+    gl.uniform1i(P.display.u.uDye, dye.read.attach(0)); gl.uniform1i(P.display.u.uVel, velocity.read.attach(1));
+    gl.uniform2f(P.display.u.rot, rot[0], rot[1]); gl.uniform1f(P.display.u.time, time); gl.uniform1f(P.display.u.steps, stepsN); gl.uniform1f(P.display.u.frm, (frames % 64));
     gl.uniform3fv(P.display.u.cMid, col.mid); gl.uniform3fv(P.display.u.cHigh, col.high); gl.uniform3fv(P.display.u.cLight, col.light);
     gl.clearColor(0, 0, 0, 0);
     blit(null);
@@ -176,7 +213,7 @@
 
   /* ---- canvas sizing (device pixels), independent of simulation resolution ---- */
   function fit() {
-    var d = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+    var d = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.6);
     var w = Math.max(2, Math.round(canvas.clientWidth * d)), h = Math.max(2, Math.round(canvas.clientHeight * d));
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
   }
@@ -191,9 +228,11 @@
         var dx = p[0] - last[0], dy = p[1] - last[1], sp = Math.sqrt(dx * dx + dy * dy);
         if (sp > 1e-5) splat(p[0], p[1], dx * 2600, dy * 2600, Math.min(0.16, sp * 5), 0.0014);
       }
-      last = p;
+      last = p; inside = true;
+      rotT[0] = (p[0] - 0.5) * 2 * 0.62; rotT[1] = -(p[1] - 0.5) * 2 * 0.34;
     });
-    canvas.addEventListener('pointerleave', function () { last = null; });
+    canvas.addEventListener('pointerleave', function () { last = null; inside = false; });
+    canvas.addEventListener('pointerenter', function () { inside = true; });
     canvas.addEventListener('pointerdown', function (e) {
       var p = uvOf(e);
       for (var i = 0; i < 10; i++) { var a = i / 10 * 6.283; splat(p[0] + Math.cos(a) * 0.012, p[1] + Math.sin(a) * 0.012, Math.cos(a) * 520, Math.sin(a) * 520, 0.05, 0.0016); }
@@ -209,6 +248,8 @@
     var dt = Math.min((now - lastT) / 1000, 0.033); lastT = now;
     if (++frames % 45 === 0) fit();
     if (!reduce) { time += dt; step(Math.max(dt, 0.006) * 0.8); }
+    if (!inside) { rotT[0] = Math.sin(time * 0.27) * 0.3; rotT[1] = Math.sin(time * 0.19) * 0.1; }
+    rot[0] += (rotT[0] - rot[0]) * Math.min(1, dt * 4); rot[1] += (rotT[1] - rot[1]) * Math.min(1, dt * 4);
     draw();
   }
   API.setActive = function (on) {

@@ -87,13 +87,13 @@
      3D world: every section is broken into panels placed in real 3D space.
      The camera flies forward (scroll = throttle); nothing scrolls or pans.
      ------------------------------------------------------------------ */
-  var T = { panels: [], groups: [], stops: [], K: 1.5, lastD: 0, W: 0, H: 0, narrow: false, space: null, ready: false, lastCam: -1e9, curGroup: -1, anchors: {}, world: null, stage: null };
+  var T = { cam: 0, target: 0, vel: 0, drag: false, panels: [], groups: [], stops: [], K: 1.5, lastD: 0, W: 0, H: 0, narrow: false, space: null, ready: false, lastCam: -1e9, curGroup: -1, anchors: {}, world: null, stage: null };
   var PERSP = 1000;
   var CAM_K = 0.0042, FOG_K = 0.0032; // scroll/world px → fog units
   var GROUPS = [
-    { id: 'top', name: 'Intro', mood: 'hero' }, { id: 'manifesto', name: 'The premise', mood: 'deep' }, { id: 'name', name: 'The name', mood: 'deep' },
-    { id: 'services', name: 'Services', mood: 'steel' }, { id: 'process', name: 'Process', mood: 'teal' }, { id: 'approach', name: 'Approach', mood: 'steel' },
-    { id: 'engagements', name: 'Engagements', mood: 'ember' }, { id: 'faq', name: 'Questions', mood: 'deep' }, { id: 'contact', name: 'Start a project', mood: 'violet' }
+    { id: 'top', name: 'Intro', mood: 'hero' }, { id: 'manifesto', name: 'The premise', mood: 'deep' }, { id: 'name', name: 'The name', mood: 'void' },
+    { id: 'services', name: 'Services', mood: 'daylight' }, { id: 'process', name: 'Process', mood: 'teal' }, { id: 'approach', name: 'Approach', mood: 'dusk' },
+    { id: 'engagements', name: 'Engagements', mood: 'ember' }, { id: 'faq', name: 'Questions', mood: 'graphite' }, { id: 'contact', name: 'Start a project', mood: 'violet' }
   ];
 
   // Where everything lives. d = depth along the flight path (world px), x/y = offset from the path.
@@ -170,7 +170,6 @@
     var stage = doc.createElement('div'); stage.className = 'stage';
     var world = doc.createElement('div'); world.className = 'world';
     stage.appendChild(world);
-    T.space = doc.createElement('div'); T.space.className = 'scroll-space';
     var defs = specs(innerWidth, innerHeight, innerWidth < 900);
     defs.forEach(function (sp) {
       var el = doc.createElement('div'); el.className = 'panel' + (sp.full ? ' panel--full' : '');
@@ -179,7 +178,7 @@
       var units = $$('.wd', el).filter(function (u) { return !u.closest('.manifesto__text') && !u.closest('#top'); });
       T.panels.push({ el: el, key: sp.key, g: sp.g, units: units, vis: false, emerged: true, hit: false, sig: '', d: 0, px: 0, py: 0, fit: 1 });
     });
-    main.appendChild(stage); main.appendChild(T.space);
+    main.appendChild(stage);
     T.world = world; T.stage = stage;
     root.classList.add('tunnel');
   }
@@ -196,7 +195,7 @@
     var W = window.innerWidth, H = window.innerHeight, n = W < 900;
     T.W = W; T.H = H; T.narrow = n;
     // gentler speed on phones where a swipe covers a lot of ground
-    T.K = n ? 1.7 : 1.5;
+    T.K = 1;
     var defs = specs(W, H, n);
     var last = 0;
     T.stops = []; T.anchors = {};
@@ -219,8 +218,8 @@
     });
     T.lastD = last;
     T.stops.sort(function (a, b) { return a - b; });
-    T.space.style.height = (last / T.K + H) + 'px';
-    T.total = last / T.K;
+    T.total = last;
+    T.cam = clamp(T.cam, 0, last); T.target = clamp(T.target, 0, last);
     T.ready = true; T.lastCam = -1e9;
   }
 
@@ -228,14 +227,14 @@
      Smooth scroll (Lenis) wired into GSAP's ticker
      ------------------------------------------------------------------ */
   var lenis = null;
-  if (window.Lenis && !reduce) {
-    lenis = new window.Lenis({ duration: tunnelOn ? 1.5 : 1.2, easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); }, smoothWheel: true, autoRaf: false });
+  if (window.Lenis && !reduce && !tunnelOn) {
+    lenis = new window.Lenis({ duration: 1.2, easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); }, smoothWheel: true, autoRaf: false });
     lenis.on('scroll', ST.update);
     gsap.ticker.add(function (t) { lenis.raf(t * 1000); });
-    gsap.ticker.lagSmoothing(0);
     lenis.stop();
   }
-  function scrollY() { return lenis ? lenis.scroll : window.scrollY; }
+  gsap.ticker.lagSmoothing(0);
+  function scrollY() { return tunnelOn ? T.cam : (lenis ? lenis.scroll : window.scrollY); }
   function anchorY(el) {
     var p = panelOf(el);
     if (p) return p.d / T.K;
@@ -248,6 +247,7 @@
     if (typeof target === 'number') y = target;
     else if (tunnelOn) y = anchorY(target);
     else y = target.getBoundingClientRect().top + window.scrollY;
+    if (tunnelOn) { T.target = clamp(y, 0, T.lastD); return; }
     if (lenis) {
       var dist = Math.abs(y - scrollY());
       navBusy = true;
@@ -269,7 +269,7 @@
     menu.classList.toggle('is-open', open);
     menu.setAttribute('aria-hidden', String(!open));
     if (open) { menu.removeAttribute('inert'); nav.classList.remove('is-hidden'); } else { menu.setAttribute('inert', ''); }
-    if (lenis) { open ? lenis.stop() : lenis.start(); } else { doc.body.style.overflow = open ? 'hidden' : ''; }
+    if (lenis) { open ? lenis.stop() : lenis.start(); } else if (!tunnelOn) { doc.body.style.overflow = open ? 'hidden' : ''; }
   }
   burger.addEventListener('click', function () { setMenu(!menuOpen); });
   doc.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menuOpen) { setMenu(false); burger.focus(); } });
@@ -291,7 +291,7 @@
 
   function onScroll() {
     var y = scrollY();
-    var max = tunnelOn ? Math.max(1, T.total) : Math.max(1, doc.documentElement.scrollHeight - window.innerHeight);
+    var max = tunnelOn ? Math.max(1, T.lastD) : Math.max(1, doc.documentElement.scrollHeight - window.innerHeight);
     if (progressBar) progressBar.style.transform = 'scaleY(' + clamp(y / max, 0, 1) + ')';
     if (!tunnelOn && !menuOpen) {
       if (y > 140 && y > lastY + 4) nav.classList.add('is-hidden');
@@ -299,7 +299,7 @@
     }
     lastY = y;
   }
-  if (lenis) lenis.on('scroll', onScroll); else window.addEventListener('scroll', onScroll, { passive: true });
+  if (lenis) lenis.on('scroll', onScroll); else if (!tunnelOn) window.addEventListener('scroll', onScroll, { passive: true });
 
   /* ------------------------------------------------------------------
      Cursor, magnetism, spotlight
@@ -387,7 +387,7 @@
       if (o.f < 0.004) { if (o.on) { o.el.style.cssText = ''; o.on = false; } continue; }
       o.on = true;
       var nx = d > 1 ? dx / d : 0, ny = d > 1 ? dy / d : 0;
-      o.el.style.cssText = 'opacity:' + (1 - o.f * 0.85).toFixed(3) + ';filter:blur(' + (o.f * o.blur).toFixed(2) + 'px);transform:translate3d(' + (nx * o.f * o.push).toFixed(1) + 'px,' + (ny * o.f * o.push * 0.6 - o.f * o.push * 0.8).toFixed(1) + 'px,0) rotate(' + (nx * o.f * 6).toFixed(2) + 'deg)';
+      o.el.style.cssText = 'opacity:' + (1 - o.f * 0.88).toFixed(3) + ';filter:blur(' + (o.f * o.blur).toFixed(2) + 'px)';
     }
   }
   if (fine && !reduce) {
@@ -426,20 +426,29 @@
   }
 
   var FAR = 900, NEAR = 620;
-  function worldTick() {
+  function worldTick(time, deltaMs) {
     if (!T.ready) return;
-    var y = scrollY(), cam = y * T.K;
+    // the camera is a critically damped spring: retargetable mid-flight, no pauses, no corrections
+    var dt = Math.min((deltaMs || 16) / 1000, 0.05);
+    if (!T.drag) {
+      var wn = 5.6, diff = T.target - T.cam;
+      T.vel += (diff * wn * wn - T.vel * 2 * wn) * dt;
+      T.cam += T.vel * dt;
+      if (Math.abs(diff) < 0.2 && Math.abs(T.vel) < 1.5) { T.cam = T.target; T.vel = 0; }
+    }
+    var cam = T.cam;
     smoke.setCamera(cam * FOG_K);
 
     // the world leans toward the pointer: depth reads as parallax
     tilt.x += (tilt.tx - tilt.x) * 0.06; tilt.y += (tilt.ty - tilt.y) * 0.06;
     if (Math.abs(tilt.x - tilt.lx) > 1e-4 || Math.abs(tilt.y - tilt.ly) > 1e-4) {
       tilt.lx = tilt.x; tilt.ly = tilt.y;
-      T.world.style.transform = 'rotateX(' + (tilt.y * 2.2).toFixed(3) + 'deg) rotateY(' + (tilt.x * 3).toFixed(3) + 'deg)';
+      T.world.style.transform = 'rotateX(' + (tilt.y * 0.9).toFixed(3) + 'deg) rotateY(' + (tilt.x * 1.3).toFixed(3) + 'deg)';
       smoke.setLook(tilt.x * 0.07, tilt.y * 0.05);
     }
     if (cam === T.lastCam) return;
     T.lastCam = cam;
+    onScroll();
 
     var n = T.panels.length, nearest = 0, nearAbs = 1e9, i, p, dz;
     for (i = 0; i < n; i++) {
@@ -457,6 +466,7 @@
       var op, bl;
       if (dz >= 0) { op = 1 - smooth(260, 800, dz); bl = smooth(120, 800, dz) * (coarse ? 9 : 16); }
       else { op = 1 - smooth(40, 480, -dz); bl = smooth(30, 480, -dz) * (coarse ? 10 : 22); }
+      p.op = op;
       var sig = dz.toFixed(1) + p.fit;
       if (sig !== p.sig) {
         p.sig = sig;
@@ -481,16 +491,27 @@
         var pv = dz < -20 ? clamp((-dz - 20) / 380, 0, 1) : 0;
         for (var c = 0; c < vanishSplit.chars.length; c++) {
           var av = clamp((pv - vanishRand[c] * 0.55) / 0.45, 0, 1), d = vanishDir[c];
-          vanishSplit.chars[c].style.cssText = av <= 0 ? '' : 'opacity:' + (1 - av).toFixed(3) + ';filter:blur(' + (av * 16).toFixed(1) + 'px);transform:translate3d(' + (d[0] * av).toFixed(1) + 'px,' + (d[1] * av).toFixed(1) + 'px,0) rotate(' + (d[2] * av).toFixed(1) + 'deg)';
+          vanishSplit.chars[c].style.cssText = av <= 0 ? '' : 'opacity:' + (1 - av).toFixed(3) + ';filter:blur(' + (av * 16).toFixed(1) + 'px)';
         }
       } else if (p.key === 'foot' && footChars.length) {
         var fp = clamp((560 - dz) / 520, 0, 1), M = footChars.length;
         for (var f = 0; f < M; f++) {
           var fa2 = clamp(fp * (M + 4) - f, 0, 1);
-          footChars[f].style.cssText = fa2 >= 1 ? '' : 'opacity:' + fa2.toFixed(3) + ';filter:blur(' + ((1 - fa2) * 16).toFixed(1) + 'px);transform:translate3d(0,' + ((1 - fa2) * 55).toFixed(1) + '%,0)';
+          footChars[f].style.cssText = fa2 >= 1 ? '' : 'opacity:' + fa2.toFixed(3) + ';filter:blur(' + ((1 - fa2) * 16).toFixed(1) + 'px)';
         }
       }
     }
+
+    // zones: fog thins behind panels you read and gathers just outside them
+    var zl = [];
+    for (i = 0; i < n; i++) {
+      p = T.panels[i];
+      if (!p.vis || p.key === 'hero' || p.key === 'foot' || !(p.op > 0.05)) continue;
+      var zsc = PERSP / (PERSP + (p.d - cam));
+      zl.push({ x: 0.5 + p.px * zsc / T.W, y: 0.5 - p.py * zsc / T.H, hw: p.w * p.fit * zsc / 2 / T.W, hh: p.h * p.fit * zsc / 2 / T.H, s: p.op });
+    }
+    zl.sort(function (a, b) { return b.s - a.s; });
+    smoke.setZones(zl.slice(0, 6));
 
     heroLive = cam < 60;
     if (T.needMeasure && cam < 4) { T.needMeasure = false; if (!reduce) measureReactive(); }
@@ -509,20 +530,64 @@
   }
 
   /* ------------------------------------------------------------------
-     Navigation without scrolling. There is no resting place between stops:
-     whenever movement ends, the camera glides to a stop (on every device).
+     Input. Nothing scrolls. Wheel, swipe, keys and links all move the camera
+     between stops by pushing its spring target: there is no "settling" phase.
      ------------------------------------------------------------------ */
-  var snapping = false, touching = false, lastMoveT = 0, lastSy = 0, moveDir = 1;
-  function nextStop(dir) {
-    var cam = scrollY() * T.K, i;
-    if (dir > 0) { for (i = 0; i < T.stops.length; i++) if (T.stops[i] > cam + 60) return T.stops[i]; return T.stops[T.stops.length - 1]; }
-    for (i = T.stops.length - 1; i >= 0; i--) if (T.stops[i] < cam - 60) return T.stops[i];
-    return 0;
+  function stopIndexNear(x) {
+    var best = 0, bd = 1e9;
+    for (var i = 0; i < T.stops.length; i++) { var d = Math.abs(T.stops[i] - x); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  function stepStops(dir) {
+    var i = clamp(stopIndexNear(T.target) + dir, 0, T.stops.length - 1);
+    T.target = T.stops[i];
   }
   if (tunnelOn) {
-    window.addEventListener('touchstart', function () { touching = true; snapping = false; navBusy = false; }, { passive: true });
-    ['touchend', 'touchcancel'].forEach(function (ev) { window.addEventListener(ev, function () { touching = false; lastMoveT = performance.now(); }, { passive: true }); });
-    window.addEventListener('wheel', function () { snapping = false; navBusy = false; }, { passive: true });
+    // wheel: one gesture = one stop (trackpad inertia tails are part of the same gesture)
+    var wLast = 0, wAcc = 0, wDir = 0;
+    window.addEventListener('wheel', function (e) {
+      if (menuOpen) return;
+      if (e.target.closest && e.target.closest('textarea')) return;
+      e.preventDefault();
+      var dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1);
+      if (Math.abs(dy) < 3) return;
+      var dir = dy > 0 ? 1 : -1, now = performance.now(), gap = now - wLast;
+      wLast = now;
+      if (gap > 100 || dir !== wDir) { wDir = dir; wAcc = 0; stepStops(dir); return; }
+      wAcc += Math.abs(dy);
+      if (wAcc > 1700) { wAcc = 0; stepStops(dir); }       // a sustained hard spin keeps going
+    }, { passive: false });
+
+    // touch: the camera follows your finger; on release it is thrown to the stop your flick points at
+    var tc = { on: false, y0: 0, cam0: 0, ly: 0, lt: 0, v: 0, si: 0 };
+    var tk = function () { return 900 / (0.72 * Math.max(300, T.H)); };
+    window.addEventListener('touchstart', function (e) {
+      if (menuOpen || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      tc.on = true; tc.y0 = t.clientY; tc.cam0 = T.cam; tc.ly = t.clientY; tc.lt = performance.now(); tc.v = 0; tc.si = stopIndexNear(T.cam);
+      T.drag = true; T.vel = 0;
+    }, { passive: true });
+    window.addEventListener('touchmove', function (e) {
+      if (!tc.on) return;
+      var t = e.touches[0], now = performance.now(), k = tk();
+      T.cam = clamp(tc.cam0 - (t.clientY - tc.y0) * k, 0, T.lastD); T.target = T.cam;
+      var inst = -(t.clientY - tc.ly) * k / Math.max(1, now - tc.lt) * 1000;
+      tc.v = tc.v * 0.6 + inst * 0.4; tc.ly = t.clientY; tc.lt = now;
+    }, { passive: true });
+    var tEnd = function () {
+      if (!tc.on) return;
+      tc.on = false; T.drag = false;
+      // position decides, velocity assists: drag a fifth of a stop (or flick) and you commit to the next one
+      var cam = T.cam, v = tc.v, si = tc.si, moved = cam - T.stops[si];
+      var dir = Math.abs(moved) > 170 ? (moved > 0 ? 1 : -1) : (Math.abs(v) > 350 ? (v > 0 ? 1 : -1) : 0), idx = si;
+      if (dir > 0) idx = Math.max(si + 1, stopIndexNear(cam + Math.max(0, v) * 0.22));
+      else if (dir < 0) idx = Math.min(si - 1, stopIndexNear(cam + Math.min(0, v) * 0.22));
+      idx = clamp(idx, 0, T.stops.length - 1);
+      T.target = T.stops[idx]; T.vel = v * 0.5;
+    };
+    window.addEventListener('touchend', tEnd, { passive: true });
+    window.addEventListener('touchcancel', tEnd, { passive: true });
+
     doc.addEventListener('keydown', function (e) {
       if (menuOpen || e.metaKey || e.ctrlKey || e.altKey) return;
       var tag = (e.target.tagName || '').toLowerCase();
@@ -530,25 +595,11 @@
       var k = e.key, dir = 0;
       if (k === 'ArrowDown' || k === 'PageDown' || k === 'ArrowRight' || (k === ' ' && !e.shiftKey && tag !== 'button' && tag !== 'a')) dir = 1;
       else if (k === 'ArrowUp' || k === 'PageUp' || k === 'ArrowLeft' || (k === ' ' && e.shiftKey && tag !== 'button' && tag !== 'a')) dir = -1;
-      else if (k === 'Home') { e.preventDefault(); goTo(0); return; }
-      else if (k === 'End') { e.preventDefault(); goTo(T.total); return; }
+      else if (k === 'Home') { e.preventDefault(); T.target = 0; return; }
+      else if (k === 'End') { e.preventDefault(); T.target = T.lastD; return; }
       if (!dir) return;
       e.preventDefault();
-      goTo(nextStop(dir) / T.K);
-    });
-    gsap.ticker.add(function () {
-      if (!T.ready) return;
-      var now = performance.now(), sy = scrollY();
-      if (Math.abs(sy - lastSy) > 0.4) { moveDir = sy > lastSy ? 1 : -1; lastSy = sy; if (!snapping && !navBusy) lastMoveT = now; }
-      if (snapping || navBusy || touching || menuOpen || now - lastMoveT < 150) return;
-      var cam = sy * T.K, a = 0, b = T.stops[T.stops.length - 1], i;
-      for (i = 0; i < T.stops.length; i++) { if (T.stops[i] <= cam + 0.5) a = T.stops[i]; else { b = T.stops[i]; break; } }
-      if (cam - a < 6 || b - cam < 6 || b <= a) return;
-      var frac = (cam - a) / (b - a);
-      var target = moveDir > 0 ? (frac > 0.07 ? b : a) : (frac < 0.93 ? a : b);
-      snapping = true;
-      if (lenis) lenis.scrollTo(target / T.K, { duration: 0.9, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, onComplete: function () { snapping = false; lastSy = scrollY(); } });
-      else { window.scrollTo({ top: target / T.K, behavior: 'smooth' }); setTimeout(function () { snapping = false; }, 900); }
+      stepStops(dir);
     });
   }
 

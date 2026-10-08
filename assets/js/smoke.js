@@ -1,6 +1,10 @@
-/* Evanescere — Smoke v2
-   A volumetric fog the camera flies through (ray-marched in 3D, lit from ahead),
-   disturbed by a small GPU fluid simulation that follows the cursor.
+/* Evanescere — Smoke v3
+   A volumetric fog the camera flies through (ray-marched in 3D), lit from the far end, disturbed by a
+   small GPU fluid simulation that follows the cursor.
+   • Smoothly interpolated 3D noise (C1) at 16-bit precision: no lattice artefacts in the lighting.
+   • Temporal accumulation at rest: per-pixel jitter averages out, so the fog stays crisp and clean.
+   • Crepuscular light shafts, foreground dust with parallax, cursor light, and fog that clears behind text.
+   • Always in slow motion: wind and a gentle camera drift keep it alive even when nothing is touched.
    Exposes window.Smoke. Fails soft: without WebGL2 the CSS fog fallback shows. */
 (function () {
   'use strict';
@@ -11,7 +15,7 @@
   var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
   var qs = (location.search.match(/[?&]q=(\w+)/) || [])[1]; // ?q=low for slow machines / testing
 
-  var API = { setLook: function () {}, ok: false, setMood: function () {}, splat: function () {}, burst: function () {}, kick: function () {}, scroll: function () {}, setCamera: function () {}, setPulse: function () {} };
+  var API = { ok: false, setLook: function () {}, setMood: function () {}, splat: function () {}, burst: function () {}, kick: function () {}, scroll: function () {}, setCamera: function () {}, setPulse: function () {}, setZones: function () {}, palette: function () { return null; } };
   window.Smoke = API;
   if (!canvas) return;
 
@@ -29,12 +33,14 @@
     curl: 10,
     splatRadius: 0.16,
     splatForce: 2200,
-    timeScale: 0.42,          // the whole simulation runs in slow motion
-    fogScale: coarse ? 0.4 : 0.55,
-    steps: coarse ? 16 : 26
+    timeScale: 0.42,
+    fogScale: coarse ? 0.5 : 0.7,
+    steps: coarse ? 20 : 30,
+    dust: coarse ? 240 : 520
   };
-  if (qs === 'low') { cfg.fogScale = 0.22; cfg.steps = 12; }
-if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
+  if (qs === 'low') { cfg.fogScale = 0.25; cfg.steps = 12; cfg.dust = 120; }
+  if (qs === 'hi') { cfg.fogScale = 0.6; cfg.steps = 26; }
+  if (qs === 'mid') { cfg.fogScale = 0.4; cfg.steps = 18; cfg.dust = 240; }
 
   /* ---------- Shaders ---------- */
   var VS = '#version 300 es\nprecision highp float;\nin vec2 aPos;\nout vec2 vUv,vL,vR,vT,vB;\nuniform vec2 texel;\nvoid main(){vUv=aPos*.5+.5;vL=vUv-vec2(texel.x,0.);vR=vUv+vec2(texel.x,0.);vT=vUv+vec2(0.,texel.y);vB=vUv-vec2(0.,texel.y);gl_Position=vec4(aPos,0.,1.);}';
@@ -50,60 +56,97 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     grad: HEAD + 'uniform sampler2D uP,uV;\nvoid main(){float L=texture(uP,vL).x,R=texture(uP,vR).x,T=texture(uP,vT).x,B=texture(uP,vB).x;vec2 v=texture(uV,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
     clear: HEAD + 'uniform sampler2D uT;uniform float v;\nvoid main(){o=v*texture(uT,vUv);}',
 
-    /* Volumetric fog. Camera travels along +z through a 3D noise field, lit from the far end. */
+    /* Volumetric fog. The camera travels along +z through a 3D noise field, lit from the far end.
+       Noise is sampled with smoothstep-remapped trilinear weights, so the field is C1-continuous:
+       no grid-aligned creases in the shadow edges. Result is blended with the previous frame (temporal
+       accumulation) so per-pixel jitter averages away instead of reading as speckle. */
     fog: HEAD +
-      'uniform sampler3D uNoise;uniform sampler2D uDye,uVel;\n' +
-      'uniform float time,aspect,camZ,pulse,glow,expo;uniform vec2 look;uniform int uSteps;\n' +
+      'uniform sampler3D uNoise;uniform sampler2D uDye,uVel,uPrev;\n' +
+      'uniform float time,aspect,camZ,pulse,glow,expo,uDens,blend,frame;uniform vec2 look;uniform int uSteps;\n' +
       'uniform vec3 cDeep,cMid,cHigh,cLight,cBg;\n' +
-      'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n' +
+      'float ign(vec2 p,float f){p+=5.588238*f;return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}\n' +
       'vec2 axis(float z){return vec2(sin(z*.21)*.55+sin(z*.047)*.8,cos(z*.17)*.35);}\n' +
-      'float dens(vec3 p){\n' +
+      'vec4 nz(vec3 q){vec3 p=q*64.;vec3 i=floor(p);vec3 f=p-i;f=f*f*(3.-2.*f);return textureLod(uNoise,(i+f+.5)/64.,0.);}\n' +
+      'float den(vec3 p){\n' +
+      ' p+=vec3(time*.055,time*.022,0.);\n' +                       // wind: the smoke drifts sideways even when nothing moves
       ' vec3 q=p*.075;\n' +
-      ' vec3 w=textureLod(uNoise,q*.5+vec3(0.,0.,time*.0012),0.).gba-.5;\n' +
+      ' vec3 w=nz(q*.5+vec3(0.,0.,time*.006)).gba-.5;\n' +
       ' q+=w*.3;\n' +
-      ' float f=textureLod(uNoise,q,0.).r*.62+textureLod(uNoise,q*2.1+vec3(.37,.11,.71),0.).g*.30+textureLod(uNoise,q*4.3+vec3(.61,.83,.19),0.).b*.08;\n' +
+      ' float f=nz(q).r*.62+nz(q*2.1+vec3(.37,.11,.71)).g*.30+nz(q*4.3+vec3(.61,.83,.19)).b*.08;\n' +
       ' return smoothstep(.53,.88,f);}\n' +
       'void main(){\n' +
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
       ' vec3 rd=normalize(vec3(p+vel*.0007+look,1.15));\n' +
-      ' vec3 ro=vec3(axis(camZ),camZ);\n' +
-      ' float st=.16;float t=.2+hash(gl_FragCoord.xy)*st;\n' +
+      ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.05)*.25,cos(time*.04)*.15),camZ);\n' +
+      ' float st=.15;float t=.2+ign(gl_FragCoord.xy,frame)*st;\n' +
       ' float T=1.;vec3 acc=vec3(0.);\n' +
       ' vec3 L=normalize(vec3(.18,.28,1.));\n' +
-      ' for(int i=0;i<40;i++){\n' +
+      ' for(int i=0;i<44;i++){\n' +
       '  if(i>=uSteps)break;\n' +
       '  vec3 pos=ro+rd*t;\n' +
       '  vec2 ax=axis(pos.z);\n' +
       '  float r=length(pos.xy-ax);\n' +
-      '  float d=dens(pos)*mix(1.,smoothstep(.25,2.4,r),.8);\n' +
+      '  float d=den(pos)*mix(1.,smoothstep(.25,2.4,r),.8);\n' +
       '  d*=smoothstep(.1,1.,t);\n' +
       '  d+=dye*1.4*smoothstep(3.,.2,t);\n' +
-      '  d*=1.+pulse*.9;\n' +
+      '  d*=uDens*(1.+pulse*.9);\n' +
       '  if(d>.004){\n' +
-      '   float dl=dens(pos+L*.6)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.6-ax)),.8);\n' +
+      '   float dl=den(pos+L*.6)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.6-ax)),.8);\n' +
       '   float sh=exp(-dl*2.4);\n' +
       '   float a=1.-exp(-d*st*2.6);\n' +
       '   vec3 col=cDeep*.5+cMid*(.25+.75*sh)*.9+cHigh*sh*sh*.8;\n' +
       '   acc+=T*a*col*exp(-t*.11);T*=1.-a;\n' +
       '   if(T<.03)break;}\n' +
-      '  t+=st;st*=1.085;}\n' +
+      '  t+=st;st*=1.07;}\n' +
       ' vec3 c=cBg+acc*expo;\n' +
       ' c+=cLight*exp(-dot(p,p)*2.6)*(.2+.2*glow+.3*pulse)*T;\n' +
-      ' o=vec4(c,1.);}',
+      ' o=vec4(mix(texture(uPrev,vUv).rgb,c,blend),1.);}',
 
-    /* Composite at full resolution: upsample, vignette, pointer bloom, dithered grain (kills banding) */
+    /* Composite at full resolution: unsharp, light shafts, content-aware density, cursor light, grain. */
     display: HEAD +
-      'uniform sampler2D uFog;uniform vec2 ptr;uniform float time,glow,aspect;uniform vec3 cLight;\n' +
+      'uniform sampler2D uFog;uniform vec2 ptr,look;uniform float time,glow,aspect,rays,pulse;uniform vec3 cLight,cMid;\n' +
+      'uniform int nZ;uniform vec4 zr[6];uniform float zs[6];\n' +
       'float h(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n' +
       'void main(){\n' +
       ' vec3 c=texture(uFog,vUv).rgb;\n' +
-      ' float pd=length((vUv-ptr)*vec2(aspect,1.));c+=cLight*exp(-pd*pd*30.)*glow*.07;\n' +
+      ' vec2 tx=1./vec2(textureSize(uFog,0));\n' +
+      ' vec3 b=(texture(uFog,vUv+vec2(tx.x,0.)).rgb+texture(uFog,vUv-vec2(tx.x,0.)).rgb+texture(uFog,vUv+vec2(0.,tx.y)).rgb+texture(uFog,vUv-vec2(0.,tx.y)).rgb)*.25;\n' +
+      ' c+=(c-b)*.6;\n' +                                              // crisp wisp edges
+      // crepuscular rays: the brighter fog is smeared back toward the light at the vanishing point
+      ' vec2 cen=vec2(.5)+look*vec2(.45,.55);vec2 dd=(cen-vUv)*(.85/18.);vec2 uv=vUv;vec3 r=vec3(0.);float w=1.;\n' +
+      ' for(int i=0;i<18;i++){uv+=dd;vec3 s=texture(uFog,uv).rgb;r+=s*smoothstep(.10,.45,dot(s,vec3(.3333)))*w;w*=.93;}\n' +
+      ' c+=cLight*dot(r,vec3(.3333))*.016*rays*(.6+1.2*pulse);\n' +
+      // fog clears behind panels (legibility) and gathers just outside them (separation)
+      ' float dim=1.,halo=0.;\n' +
+      ' for(int i=0;i<6;i++){if(i>=nZ)break;vec4 z=zr[i];vec2 q=(vUv-z.xy)/z.zw;float k=pow(pow(abs(q.x),3.)+pow(abs(q.y),3.),.3333);\n' +
+      '  float inside=1.-smoothstep(.6,1.9,k);float ring=smoothstep(1.,1.6,k)*(1.-smoothstep(1.6,2.8,k));\n' +
+      '  dim*=1.-.30*inside*zs[i];halo+=ring*zs[i];}\n' +
+      ' c*=dim;c+=cMid*halo*.09;\n' +
+      // the cursor carries a light: it lights the fog near it
+      ' float pd=length((vUv-ptr)*vec2(aspect,1.));\n' +
+      ' c+=cLight*exp(-pd*pd*22.)*glow*(.03+1.5*dot(c,vec3(.3333)));\n' +
       ' float vg=smoothstep(1.3,.2,length((vUv-.5)*vec2(1.,.9)));c*=.5+.5*vg;\n' +
       ' float n=h(gl_FragCoord.xy+fract(time)*91.)+h(gl_FragCoord.yx*1.3+fract(time*1.7)*57.)-1.;\n' +
-      ' c+=n*(.9/255.)+(h(gl_FragCoord.xy*.7+time)-.5)*.018;\n' +
+      ' c+=n*(.9/255.);\n' +
       ' o=vec4(max(c,0.),1.);}'
   };
+
+  /* Foreground dust: drifting motes at many depths. They stream past as the camera flies (parallax),
+     and keep drifting slowly when it is still. */
+  var DUST_VS = '#version 300 es\nprecision highp float;\nuniform float time,camZ,aspect,dpr,pulse;uniform vec2 look;\nout float vA;\n' +
+    'float h1(float n){return fract(sin(n*127.1)*43758.5453);}\n' +
+    'void main(){\n' +
+    ' float id=float(gl_VertexID);vec3 s=vec3(h1(id),h1(id+17.3),h1(id+41.7));\n' +
+    ' float R=12.;float z=fract(s.z-camZ/R-time*.004)*R+.05;\n' +
+    ' vec2 xy=(s.xy*2.-1.)*vec2(aspect,1.)*(z*.95+.35);\n' +
+    ' xy+=vec2(sin(time*.11+s.x*30.),cos(time*.09+s.y*30.))*.25;\n' +
+    ' vec2 p=xy/z*1.15+look;\n' +
+    ' gl_Position=vec4(p/vec2(aspect,1.)*2.,0.,1.);\n' +
+    ' float near=smoothstep(.5,1.6,z),far=1.-smoothstep(6.,11.,z);\n' +
+    ' vA=near*far*(.25+.75*h1(id+5.))*(1.+pulse*1.5);\n' +
+    ' gl_PointSize=clamp((1.6+3.4*h1(id+9.))*dpr*clamp(2.2/z,.6,3.),1.5,18.*dpr);}';
+  var DUST_FS = '#version 300 es\nprecision highp float;\nin float vA;uniform vec3 cLight;out vec4 o;\nvoid main(){vec2 q=gl_PointCoord*2.-1.;float a=exp(-dot(q,q)*3.5)*vA*.5;if(a<.004)discard;o=vec4(cLight*a,a);}';
 
   function compile(type, src) {
     var s = gl.createShader(type);
@@ -112,11 +155,11 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     return s;
   }
   var vs = compile(gl.VERTEX_SHADER, VS);
-  function program(fsrc) {
+  function link(vsh, fsrc) {
     var p = gl.createProgram();
     var f = compile(gl.FRAGMENT_SHADER, fsrc);
-    if (!vs || !f) return null;
-    gl.attachShader(p, vs); gl.attachShader(p, f);
+    if (!vsh || !f) return null;
+    gl.attachShader(p, vsh); gl.attachShader(p, f);
     gl.bindAttribLocation(p, 0, 'aPos');
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.warn(gl.getProgramInfoLog(p)); return null; }
@@ -126,7 +169,9 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
   }
 
   var P = {};
-  for (var k in FS) { P[k] = program(FS[k]); if (!P[k]) { root.classList.add('no-gl'); root.classList.remove('has-gl'); return; } }
+  for (var k in FS) { P[k] = link(vs, FS[k]); if (!P[k]) { root.classList.add('no-gl'); root.classList.remove('has-gl'); return; } }
+  var dustP = link(compile(gl.VERTEX_SHADER, DUST_VS), DUST_FS);
+  var dustVao = gl.createVertexArray();
 
   var buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -163,7 +208,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     var a = makeFBO(w, h, filter), b = makeFBO(w, h, filter);
     return { w: w, h: h, tx: a.tx, ty: a.ty, get read() { return a; }, get write() { return b; }, swap: function () { var t = a; a = b; b = t; } };
   }
-  function free(f) { if (!f) return; [f.tex].forEach(function (t) { gl.deleteTexture(t); }); gl.deleteFramebuffer(f.fbo); }
+  function free(f) { if (!f) return; gl.deleteTexture(f.tex); gl.deleteFramebuffer(f.fbo); }
   function resolution(base) {
     var ar = gl.drawingBufferWidth / gl.drawingBufferHeight;
     if (ar < 1) ar = 1 / ar;
@@ -171,20 +216,21 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     return gl.drawingBufferWidth > gl.drawingBufferHeight ? { w: mx, h: mn } : { w: mn, h: mx };
   }
 
-  var velocity, dye, divergence, curl, pressure, fogT;
+  var velocity, dye, divergence, curl, pressure, fog, framesSinceReset = 0;
   function initTargets() {
-    [velocity, dye, pressure].forEach(function (d) { if (d) { free(d.read); free(d.write); } });
-    free(divergence); free(curl); free(fogT);
+    [velocity, dye, pressure, fog].forEach(function (d) { if (d) { free(d.read); free(d.write); } });
+    free(divergence); free(curl);
     var s = resolution(cfg.simRes), d = resolution(cfg.dyeRes);
     velocity = makeDouble(s.w, s.h, gl.LINEAR);
     dye = makeDouble(d.w, d.h, gl.LINEAR);
     divergence = makeFBO(s.w, s.h, gl.NEAREST);
     curl = makeFBO(s.w, s.h, gl.NEAREST);
     pressure = makeDouble(s.w, s.h, gl.NEAREST);
-    fogT = makeFBO(Math.max(2, Math.round(gl.drawingBufferWidth * cfg.fogScale)), Math.max(2, Math.round(gl.drawingBufferHeight * cfg.fogScale)), gl.LINEAR);
+    fog = makeDouble(Math.max(2, Math.round(gl.drawingBufferWidth * cfg.fogScale)), Math.max(2, Math.round(gl.drawingBufferHeight * cfg.fogScale)), gl.LINEAR);
+    framesSinceReset = 0;
   }
 
-  /* ---------- 3D noise: blurred random fields (smooth, no lattice artefacts), 4 decorrelated channels ---------- */
+  /* ---------- 3D noise: blurred random fields, 4 decorrelated channels, uploaded at 16-bit precision ---------- */
   function makeNoise(N) {
     var ch = 4, f = new Float32Array(N * N * N * ch), seed = 90210;
     function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
@@ -208,8 +254,6 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
       var sd = Math.sqrt(v / n) || 1;
       for (q = c; q < f.length; q += ch) f[q] = Math.max(0, Math.min(1, 0.5 + (f[q] - mean) / sd * 0.16));
     }
-    var u8 = new Uint8Array(f.length);
-    for (i = 0; i < f.length; i++) u8[i] = Math.round(f[i] * 255);
     var tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_3D, tex);
@@ -218,7 +262,7 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.REPEAT);
-    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, N, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, u8);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA16F, N, N, N, 0, gl.RGBA, gl.FLOAT, f);
     return tex;
   }
   var noiseTex = makeNoise(64);
@@ -236,30 +280,42 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
   resize();
   initTargets();
 
-  /* ---------- Moods (smoothly interpolated) ---------- */
+  /* ---------- Moods: each room has its own colour story, light and density ---------- */
   function hex(h) { return [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255]; }
   var moods = {
-    hero:   { deep: '#0b1330', mid: '#5a78a8', high: '#d9e8ff', light: '#cfe0ff', bg: '#04060a', expo: 0.7 },
-    deep:   { deep: '#080d26', mid: '#465f8e', high: '#c3d6f7', light: '#a9c2f0', bg: '#03050a', expo: 0.7 },
-    steel:  { deep: '#0a1226', mid: '#58769c', high: '#dbe9f9', light: '#c4dcf5', bg: '#04060a', expo: 0.7 },
-    teal:   { deep: '#06161f', mid: '#4a8394', high: '#d0f0f2', light: '#aef2ea', bg: '#03070a', expo: 0.7 },
-    ember:  { deep: '#170f20', mid: '#7d6c92', high: '#ffe6d2', light: '#ffc994', bg: '#05050a', expo: 0.7 },
-    violet: { deep: '#150f33', mid: '#7062a6', high: '#e5dcff', light: '#cbb4ff', bg: '#05050b', expo: 0.5 }
+    hero:     { deep: '#0b1330', mid: '#5a78a8', high: '#d9e8ff', light: '#cfe0ff', bg: '#04060a', expo: 0.85, dens: 1.0,  rays: 1.0 },   // cold steel
+    deep:     { deep: '#080b22', mid: '#46528f', high: '#c3cff7', light: '#a9b8f0', bg: '#03040a', expo: 0.6,  dens: 0.85, rays: 0.7 },   // ink indigo
+    void:     { deep: '#05070f', mid: '#2c3a58', high: '#bcd0ff', light: '#e8f0ff', bg: '#02030a', expo: 0.45, dens: 0.7,  rays: 1.9 },   // black, one hard light
+    daylight: { deep: '#16243d', mid: '#7f9bbb', high: '#f1f7ff', light: '#ffffff', bg: '#0a1220', expo: 1.05, dens: 1.1,  rays: 0.9 },   // pale, silver, bright
+    teal:     { deep: '#04171a', mid: '#3f8c8a', high: '#c9f6ee', light: '#8ff0d8', bg: '#02080a', expo: 0.85, dens: 1.0,  rays: 1.2 },   // sea green
+    dusk:     { deep: '#1a1226', mid: '#80698f', high: '#f4d9e8', light: '#ffc3d6', bg: '#07050b', expo: 0.8,  dens: 0.95, rays: 1.1 },   // rose slate
+    ember:    { deep: '#1d1008', mid: '#a5714a', high: '#ffe3c0', light: '#ffb25e', bg: '#080402', expo: 0.9,  dens: 1.0,  rays: 1.5 },   // warm amber
+    graphite: { deep: '#0d0f13', mid: '#4a5260', high: '#dfe5ee', light: '#b7c2d4', bg: '#030406', expo: 0.55, dens: 0.75, rays: 0.6 },   // neutral
+    violet:   { deep: '#150f33', mid: '#7062a6', high: '#e5dcff', light: '#cbb4ff', bg: '#05050b', expo: 0.5,  dens: 0.85, rays: 0.8 }    // dark violet (frames the logo)
   };
   var keys = ['deep', 'mid', 'high', 'light', 'bg'];
-  var cur = {}, tgt = {}, expo = 0.85, expoT = 0.85;
+  var cur = {}, tgt = {}, nums = { expo: 0.85, dens: 1, rays: 1 }, numsT = { expo: 0.85, dens: 1, rays: 1 };
   keys.forEach(function (k) { cur[k] = hex(moods.hero[k]); tgt[k] = cur[k].slice(); });
   API.palette = function () { return { mid: cur.mid, high: cur.high, light: cur.light }; };
-  API.setMood = function (name) { var m = moods[name]; if (!m) return; keys.forEach(function (k) { tgt[k] = hex(m[k]); }); expoT = m.expo; };
+  API.settle = function () { keys.forEach(function (k) { cur[k] = tgt[k].slice(); }); for (var nk in nums) nums[nk] = numsT[nk]; blend = 1; framesSinceReset = 0; };
+  API.setMood = function (name) {
+    var m = moods[name]; if (!m) return;
+    keys.forEach(function (k) { tgt[k] = hex(m[k]); });
+    numsT.expo = m.expo; numsT.dens = m.dens; numsT.rays = m.rays;
+  };
 
-  /* ---------- Camera ---------- */
-  var camTarget = 0, camZ = 0, pulse = 0, pulseT = 0;
+  /* ---------- Camera + content zones ---------- */
+  var camTarget = 0, camZ = 0, pulse = 0, pulseT = 0, lastCam = 0, camSpeed = 0;
   API.setCamera = function (z) { camTarget = z; };
   API.setPulse = function (p) { pulseT = p; };
   var look = [0, 0], lookT = [0, 0];
   API.setLook = function (x, y) { lookT[0] = x; lookT[1] = y; };
-  API.scroll = function () {};
-  API.kick = function () {};
+  var zr = new Float32Array(24), zs = new Float32Array(6), nZ = 0;
+  // zones: [{x, y, hw, hh, s}] in uv units (y up), strength 0..1
+  API.setZones = function (list) {
+    nZ = Math.min(6, list.length);
+    for (var i = 0; i < nZ; i++) { var z = list[i]; zr[i * 4] = z.x; zr[i * 4 + 1] = z.y; zr[i * 4 + 2] = Math.max(0.001, z.hw); zr[i * 4 + 3] = Math.max(0.001, z.hh); zs[i] = z.s; }
+  };
 
   /* ---------- Splats: the cursor disturbs the fog ---------- */
   var aspect = function () { return canvas.width / canvas.height; };
@@ -289,11 +345,11 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     }
   };
 
-  var ptr = { x: 0.5, y: 0.5, px: 0.5, py: 0.5, moved: false, glow: 0, has: false };
+  var ptr = { x: 0.5, y: 0.5, px: 0.5, py: 0.5, moved: false, glow: 0, has: false, lastMove: 0 };
   function pointerAt(cx, cy) {
     var x = cx / window.innerWidth, y = 1 - cy / window.innerHeight;
     if (!ptr.has) { ptr.px = x; ptr.py = y; ptr.has = true; }
-    ptr.px = ptr.x; ptr.py = ptr.y; ptr.x = x; ptr.y = y; ptr.moved = true; ptr.glow = 1;
+    ptr.px = ptr.x; ptr.py = ptr.y; ptr.x = x; ptr.y = y; ptr.moved = true; ptr.glow = 1; ptr.lastMove = performance.now();
   }
   window.addEventListener('pointermove', function (e) { pointerAt(e.clientX, e.clientY); }, { passive: true });
   window.addEventListener('touchmove', function (e) { var t = e.touches[0]; if (t) pointerAt(t.clientX, t.clientY); }, { passive: true });
@@ -308,6 +364,14 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
     var sp = Math.sqrt(dx * dx + dy * dy);
     if (sp < 1e-5) return;
     splat(ptr.x, ptr.y, dx * cfg.splatForce, dy * cfg.splatForce, Math.min(0.14, 0.02 + sp * 4));
+  }
+
+  // two slow wandering currents: with no input the smoke still turns over, gently
+  function ambient(t) {
+    for (var i = 0; i < 2; i++) {
+      var ph = t * (0.05 + i * 0.023) + i * 3.1;
+      splat(0.5 + 0.38 * Math.sin(ph * 1.3 + i), 0.5 + 0.3 * Math.cos(ph * 0.9), Math.cos(ph * 1.7) * 38, Math.sin(ph * 1.3) * 38, 0.004);
+    }
   }
 
   /* ---------- Fluid step ---------- */
@@ -368,34 +432,62 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
   }
 
   /* ---------- Render ---------- */
+  var frameNo = 0, blend = 1, blendT = 1;
   function draw(t) {
+    var cz = camZ + (reduceMotion ? 0 : t * 0.07);
+    gl.disable(gl.BLEND);
     gl.useProgram(P.fog.p);
     var u = P.fog.u;
     gl.uniform1i(u.uDye, dye.read.attach(0));
     gl.uniform1i(u.uVel, velocity.read.attach(1));
+    gl.uniform1i(u.uPrev, fog.read.attach(2));
     gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_3D, noiseTex);
     gl.uniform1i(u.uNoise, 4);
     gl.uniform1f(u.time, t);
-    gl.uniform1f(u.aspect, fogT.w / fogT.h);
-    gl.uniform1f(u.camZ, camZ + (reduceMotion ? 0 : t * 0.035));
+    gl.uniform1f(u.aspect, fog.w / fog.h);
+    gl.uniform1f(u.camZ, cz);
     gl.uniform1f(u.pulse, pulse);
     gl.uniform1f(u.glow, ptr.glow);
-    gl.uniform1f(u.expo, expo);
+    gl.uniform1f(u.expo, nums.expo);
+    gl.uniform1f(u.uDens, nums.dens);
+    gl.uniform1f(u.blend, framesSinceReset < 3 ? 1 : blend);
+    gl.uniform1f(u.frame, frameNo & 63);
     gl.uniform2f(u.look, look[0], look[1]);
     gl.uniform1i(u.uSteps, cfg.steps);
     gl.uniform3fv(u.cDeep, cur.deep); gl.uniform3fv(u.cMid, cur.mid); gl.uniform3fv(u.cHigh, cur.high);
     gl.uniform3fv(u.cLight, cur.light); gl.uniform3fv(u.cBg, cur.bg);
-    blit(fogT);
+    blit(fog.write); fog.swap();
+    framesSinceReset++; frameNo++;
 
     gl.useProgram(P.display.p);
     var d = P.display.u;
-    gl.uniform1i(d.uFog, fogT.attach(0));
+    gl.uniform1i(d.uFog, fog.read.attach(0));
     gl.uniform2f(d.ptr, ptr.x, ptr.y);
+    gl.uniform2f(d.look, look[0], look[1]);
     gl.uniform1f(d.time, t);
     gl.uniform1f(d.glow, ptr.glow);
     gl.uniform1f(d.aspect, aspect());
-    gl.uniform3fv(d.cLight, cur.light);
+    gl.uniform1f(d.rays, nums.rays);
+    gl.uniform1f(d.pulse, pulse);
+    gl.uniform3fv(d.cLight, cur.light); gl.uniform3fv(d.cMid, cur.mid);
+    gl.uniform1i(d.nZ, nZ);
+    gl.uniform4fv(d['zr[0]'], zr); gl.uniform1fv(d['zs[0]'], zs);
     blit(null);
+
+    // foreground dust, additive over the finished frame
+    if (dustP && cfg.dust > 0) {
+      gl.useProgram(dustP.p);
+      gl.bindVertexArray(dustVao);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+      var du = dustP.u;
+      gl.uniform1f(du.time, t); gl.uniform1f(du.camZ, cz); gl.uniform1f(du.aspect, aspect());
+      gl.uniform1f(du.dpr, canvas.width / Math.max(1, canvas.clientWidth)); gl.uniform1f(du.pulse, pulse);
+      gl.uniform2f(du.look, look[0], look[1]); gl.uniform3fv(du.cLight, cur.light);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.drawArrays(gl.POINTS, 0, cfg.dust);
+      gl.disable(gl.BLEND);
+      gl.bindVertexArray(null);
+    }
   }
 
   /* ---------- Loop with adaptive quality ---------- */
@@ -413,26 +505,30 @@ if (qs === 'hi') { cfg.fogScale = 0.5; cfg.steps = 24; }
       if (ema > 28) slow++; else slow = Math.max(0, slow - 1);
       if (slow > 60 && tier < 3) {
         tier++; slow = 0;
-        if (tier === 1) { cfg.fogScale *= 0.8; cfg.steps = Math.max(12, cfg.steps - 6); }
-        else if (tier === 2) { cfg.fogScale *= 0.8; cfg.steps = Math.max(10, cfg.steps - 4); cfg.simRes = Math.max(64, cfg.simRes * 0.8); }
+        if (tier === 1) { cfg.fogScale *= 0.82; cfg.steps = Math.max(14, cfg.steps - 6); cfg.dust = Math.round(cfg.dust * 0.6); }
+        else if (tier === 2) { cfg.fogScale *= 0.82; cfg.steps = Math.max(12, cfg.steps - 4); cfg.simRes = Math.max(64, cfg.simRes * 0.8); }
         else { quality = 0.75; }
         resize(); initTargets();
       }
     }
 
     for (var i = 0; i < keys.length; i++) { var key = keys[i]; for (var c = 0; c < 3; c++) cur[key][c] += (tgt[key][c] - cur[key][c]) * Math.min(1, dt * 1.4); }
-    expo += (expoT - expo) * Math.min(1, dt * 1.4);
-    // camera glides toward the scroll position; pulse thickens the fog while passing between scenes
-    camZ += (camTarget - camZ) * Math.min(1, dt * 3.0);
+    for (var nk in nums) nums[nk] += (numsT[nk] - nums[nk]) * Math.min(1, dt * 1.4);
+    camZ += (camTarget - camZ) * Math.min(1, dt * 6.0);   // the camera object already glides; this only smooths hand-offs
     pulse += (pulseT - pulse) * Math.min(1, dt * 5.0);
     look[0] += (lookT[0] - look[0]) * Math.min(1, dt * 3.0); look[1] += (lookT[1] - look[1]) * Math.min(1, dt * 3.0);
 
-    applyPointer();
-    ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.8);
-    if (!reduceMotion) step(Math.max(dt, 0.004) * cfg.timeScale * 2.0);
+    // temporal accumulation: heavy history at rest (clean), light while anything is moving (no ghosting)
+    camSpeed = Math.abs(camTarget - lastCam) / Math.max(dt, 0.001); lastCam = camTarget;
+    var active = camSpeed > 8 || pulse > 0.04 || performance.now() - ptr.lastMove < 700 || Math.abs(look[0] - lookT[0]) > 0.002;
+    blendT = active ? 0.6 : 0.12;
+    blend += (blendT - blend) * Math.min(1, dt * 6.0);
 
-    // reduced motion: draw only when something changed
-    if (reduceMotion) { var moving = Math.abs(camTarget - camZ) > 1e-3 || pulse > 0.01; still = moving ? 0 : still + 1; if (still > 3) return; }
+    applyPointer();
+    ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.9);
+    if (!reduceMotion) { ambient(time); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
+
+    if (reduceMotion) { var moving = Math.abs(camTarget - camZ) > 1e-3 || pulse > 0.01; still = moving ? 0 : still + 1; if (still > 40) return; }
     draw(time);
   }
 

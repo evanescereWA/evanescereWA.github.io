@@ -527,3 +527,11 @@ html:not(.tunnel) .menu__classic, html:not(.tunnel) .foot__classic { display: no
 @media (max-width: 899px) { #logoSmoke { width: min(34vh, 320px); height: min(34vh, 320px); } }
 html:not(.tunnel) .foot__logo { margin-bottom: 0; }
 .has-cursor #logoSmoke { cursor: none; }
+
+/* ---------- v6: no native scrolling in tunnel mode; large 3D smoke logo ---------- */
+html.tunnel, html.tunnel body { overflow: hidden; height: 100%; overscroll-behavior: none; touch-action: none; }
+.tunnel .stage { touch-action: none; }
+.tunnel .foot { position: relative; overflow: visible; }
+.tunnel .foot__logo { position: absolute; left: 50%; bottom: calc(100% - 3rem); width: min(66vh, 78vw, 760px); aspect-ratio: 1; margin: 0; transform: translateX(-50%); pointer-events: none; }
+.tunnel #logoSmoke { width: 100%; height: 100%; max-width: none; pointer-events: auto; }
+@media (max-width: 899px) { .tunnel .foot__logo { width: min(62vh, 96vw); bottom: calc(100% - 4rem); } }
