@@ -74,8 +74,8 @@
       ' vec3 w2=nz(q*1.1+vec3(.5,.2,-time*.016)).gba-.5;\n' +
       ' q+=w*.32+w2*.1;\n' +
       ' vec4 a1=nz(q+vec3(0.,0.,time*.006)),a2=nz(q*2.1+vec3(.37,.11,.71-time*.010)),a3=nz(q*4.4+vec3(.61,.83,.19+time*.016));\n' +
-      ' float f=a1.r*.62+a2.g*.30+a3.b*.08;\n' +
-      ' return smoothstep(.56,.9,f);}\n' +
+      ' float f=a1.r*.70+a2.g*.26+a3.b*.04;\n' +
+      ' return smoothstep(.5,.76,f);}\n' +
       'void main(){\n' +
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
@@ -94,12 +94,11 @@
       '  d+=dye*1.4*smoothstep(3.,.2,t);\n' +
       '  d*=uDens*(1.+pulse*.9);\n' +
       '  if(d>.004){\n' +
-      '   float dl=den(pos+L*.35)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.35-ax)),.8)+den(pos+L*.9)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.9-ax)),.8);\n' +
-      '   float sh=exp(-dl*1.9);\n' +
+      '   float dl=den(pos+L*.5)*mix(1.,smoothstep(.25,2.4,length(pos.xy+L.xy*.5-ax)),.8);\n' +
+      '   float sh=exp(-dl*2.8);\n' +
       '   float a=1.-exp(-d*st*2.6);\n' +
-      '   float rim=pow(1.-clamp(d,0.,1.),2.)*sh;\n' +
-      '   vec3 col=cDeep*.16+cMid*(.03+.97*sh)*.75+cHigh*(sh*sh*1.25+rim*.55);\n' +
-      '   col*=mix(.4,1.,smoothstep(0.,.45,length(p)));\n' +
+      '   vec3 col=cDeep*.3+cMid*(.12+.88*sh)*.85+cHigh*sh*sh*1.0;\n' +
+      '   col*=mix(.55,1.,smoothstep(0.,.4,length(p)));\n' +
       '   acc+=T*a*col*exp(-t*.11);T*=1.-a;\n' +
       '   if(T<.03)break;}\n' +
       '  t+=st;st*=1.07;}\n' +
@@ -138,7 +137,7 @@
       ' c*=dim;c+=cMid*halo*.09;\n' +
       // the cursor carries a light: it lights the fog near it
       ' float pd=length((vUv-ptr)*vec2(aspect,1.));\n' +
-      ' c+=cLight*exp(-pd*pd*140.)*glow*(.018+.8*dot(c,vec3(.3333)));\n' +
+      ' c+=cLight*exp(-pd*pd*140.)*glow*(.012+.3*dot(c,vec3(.3333)));\n' +
       ' float vg=smoothstep(1.3,.2,length((vUv-.5)*vec2(1.,.9)));c*=.5+.5*vg;\n' +
       ' float n=h(gl_FragCoord.xy+fract(time)*91.)+h(gl_FragCoord.yx*1.3+fract(time*1.7)*57.)-1.;\n' +
       ' c+=n*(.9/255.);\n' +
