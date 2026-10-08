@@ -33,7 +33,7 @@
     curl: 10,
     splatRadius: 0.16,
     splatForce: 2200,
-    timeScale: 0.42,
+    timeScale: 0.26,
     fogScale: coarse ? 0.5 : 0.7,
     steps: coarse ? 20 : 30,
     dust: coarse ? 240 : 520
@@ -68,9 +68,9 @@
       'vec2 axis(float z){return vec2(sin(z*.21)*.55+sin(z*.047)*.8,cos(z*.17)*.35);}\n' +
       'vec4 nz(vec3 q){vec3 p=q*64.;vec3 i=floor(p);vec3 f=p-i;f=f*f*(3.-2.*f);return textureLod(uNoise,(i+f+.5)/64.,0.);}\n' +
       'float den(vec3 p){\n' +
-      ' p+=vec3(time*.055,time*.022,0.);\n' +                       // wind: the smoke drifts sideways even when nothing moves
+      ' p+=vec3(time*.016,time*.007,0.);\n' +                       // wind: the smoke drifts sideways even when nothing moves
       ' vec3 q=p*.075;\n' +
-      ' vec3 w=nz(q*.5+vec3(0.,0.,time*.006)).gba-.5;\n' +
+      ' vec3 w=nz(q*.5+vec3(0.,0.,time*.0018)).gba-.5;\n' +
       ' q+=w*.3;\n' +
       ' float f=nz(q).r*.62+nz(q*2.1+vec3(.37,.11,.71)).g*.30+nz(q*4.3+vec3(.61,.83,.19)).b*.08;\n' +
       ' return smoothstep(.53,.88,f);}\n' +
@@ -78,7 +78,7 @@
       ' vec2 p=(vUv-.5)*vec2(aspect,1.);\n' +
       ' vec2 vel=texture(uVel,vUv).xy;float dye=texture(uDye,vUv).x;\n' +
       ' vec3 rd=normalize(vec3(p+vel*.0007+look,1.15));\n' +
-      ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.05)*.25,cos(time*.04)*.15),camZ);\n' +
+      ' vec3 ro=vec3(axis(camZ)+vec2(sin(time*.018)*.25,cos(time*.015)*.15),camZ);\n' +
       ' float st=.15;float t=.2+ign(gl_FragCoord.xy,frame)*st;\n' +
       ' float T=1.;vec3 acc=vec3(0.);\n' +
       ' vec3 L=normalize(vec3(.18,.28,1.));\n' +
@@ -100,7 +100,7 @@
       '   if(T<.03)break;}\n' +
       '  t+=st;st*=1.07;}\n' +
       ' vec3 c=cBg+acc*expo;\n' +
-      ' c+=cLight*exp(-dot(p,p)*2.6)*(.2+.2*glow+.3*pulse)*T;\n' +
+      ' c+=cLight*exp(-dot(p,p)*.7)*(.045+.06*glow+.16*pulse)*T;\n' +
       ' o=vec4(mix(texture(uPrev,vUv).rgb,c,blend),1.);}',
 
     /* Composite at full resolution: unsharp, light shafts, content-aware density, cursor light, grain. */
@@ -125,7 +125,7 @@
       ' c*=dim;c+=cMid*halo*.09;\n' +
       // the cursor carries a light: it lights the fog near it
       ' float pd=length((vUv-ptr)*vec2(aspect,1.));\n' +
-      ' c+=cLight*exp(-pd*pd*22.)*glow*(.03+1.5*dot(c,vec3(.3333)));\n' +
+      ' c+=cLight*exp(-pd*pd*140.)*glow*(.018+.8*dot(c,vec3(.3333)));\n' +
       ' float vg=smoothstep(1.3,.2,length((vUv-.5)*vec2(1.,.9)));c*=.5+.5*vg;\n' +
       ' float n=h(gl_FragCoord.xy+fract(time)*91.)+h(gl_FragCoord.yx*1.3+fract(time*1.7)*57.)-1.;\n' +
       ' c+=n*(.9/255.);\n' +
@@ -138,9 +138,9 @@
     'float h1(float n){return fract(sin(n*127.1)*43758.5453);}\n' +
     'void main(){\n' +
     ' float id=float(gl_VertexID);vec3 s=vec3(h1(id),h1(id+17.3),h1(id+41.7));\n' +
-    ' float R=12.;float z=fract(s.z-camZ/R-time*.004)*R+.05;\n' +
+    ' float R=12.;float z=fract(s.z-camZ/R-time*.0015)*R+.05;\n' +
     ' vec2 xy=(s.xy*2.-1.)*vec2(aspect,1.)*(z*.95+.35);\n' +
-    ' xy+=vec2(sin(time*.11+s.x*30.),cos(time*.09+s.y*30.))*.25;\n' +
+    ' xy+=vec2(sin(time*.045+s.x*30.),cos(time*.036+s.y*30.))*.22;\n' +
     ' vec2 p=xy/z*1.15+look;\n' +
     ' gl_Position=vec4(p/vec2(aspect,1.)*2.,0.,1.);\n' +
     ' float near=smoothstep(.5,1.6,z),far=1.-smoothstep(6.,11.,z);\n' +
@@ -366,12 +366,13 @@
     splat(ptr.x, ptr.y, dx * cfg.splatForce, dy * cfg.splatForce, Math.min(0.14, 0.02 + sp * 4));
   }
 
-  // two slow wandering currents: with no input the smoke still turns over, gently
-  function ambient(t) {
-    for (var i = 0; i < 2; i++) {
-      var ph = t * (0.05 + i * 0.023) + i * 3.1;
-      splat(0.5 + 0.38 * Math.sin(ph * 1.3 + i), 0.5 + 0.3 * Math.cos(ph * 0.9), Math.cos(ph * 1.7) * 38, Math.sin(ph * 1.3) * 38, 0.004);
-    }
+  // Slow currents that enter from beyond the screen edges. Velocity only (no density), and tiny per frame:
+  // only their effect on the fog is ever visible, never where they come from.
+  function ambient(t, dt) {
+    var k = 8 * dt, p1 = t * 0.03, p2 = t * 0.023 + 2.4, p3 = t * 0.027 + 4.1;
+    splat(-0.02, 0.5 + 0.4 * Math.sin(p1 * 1.7), k * (1 + 0.5 * Math.sin(p1 * 2.3)), k * 0.3 * Math.cos(p1 * 1.3), 0);
+    splat(1.02, 0.5 + 0.4 * Math.cos(p2 * 1.4), -k * (1 + 0.5 * Math.sin(p2 * 2.1)), k * 0.3 * Math.sin(p2 * 1.1), 0);
+    splat(0.5 + 0.42 * Math.sin(p3 * 1.1 + 1), -0.02, k * 0.3 * Math.cos(p3), k * (0.8 + 0.4 * Math.sin(p3 * 2.9)), 0);
   }
 
   /* ---------- Fluid step ---------- */
@@ -434,7 +435,7 @@
   /* ---------- Render ---------- */
   var frameNo = 0, blend = 1, blendT = 1;
   function draw(t) {
-    var cz = camZ + (reduceMotion ? 0 : t * 0.07);
+    var cz = camZ + (reduceMotion ? 0 : t * 0.02);
     gl.disable(gl.BLEND);
     gl.useProgram(P.fog.p);
     var u = P.fog.u;
@@ -526,7 +527,7 @@
 
     applyPointer();
     ptr.glow += (0 - ptr.glow) * Math.min(1, dt * 0.9);
-    if (!reduceMotion) { ambient(time); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
+    if (!reduceMotion) { ambient(time, dt); step(Math.max(dt, 0.004) * cfg.timeScale * 2.0); }
 
     if (reduceMotion) { var moving = Math.abs(camTarget - camZ) > 1e-3 || pulse > 0.01; still = moving ? 0 : still + 1; if (still > 40) return; }
     draw(time);
