@@ -774,6 +774,8 @@
     }
     busy = true; nextBtn.disabled = true; nextLabel.textContent = 'Sending…'; errEl.textContent = '';
     data._subject = subject; data._replyto = data.email;
+    var KEY = (form.getAttribute('data-access-key') || '').trim();
+    if (KEY) { data.access_key = KEY; data.subject = subject; data.from_name = 'Evanescere website'; data.replyto = data.email; }
     fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(data) })
       .then(function (r) { if (!r.ok) throw new Error(r.status); done(data.name); })
       .catch(function () { errEl.textContent = 'Something went wrong sending that. Please email us directly at ' + MAIL + '.'; nextLabel.textContent = 'Send brief'; })
