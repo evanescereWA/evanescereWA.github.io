@@ -110,38 +110,43 @@
     var STEP = 900, Z = 0;
     var stop = function () { var d = Z; Z += STEP; return d; };
     var head = function (g, key, sel, wd) { P({ g: g, key: key, els: [q1(sel)], d: stop(), y: -2 * vh, w: wide(n ? 0.92 : wd, 1000), stop: 1 }); };
-    // desktop: two cards per stop, side by side. narrow: one card per stop.
+    // desktop: cards sit in a measured grid (cols x rows per stop), placed after layout so nothing overlaps.
+    // narrow: one card per stop.
+    var gid = 0;
     var cards = function (g, key, list, o) {
-      var per = n ? 1 : 2, i = 0;
-      while (i < list.length) {
-        var d0 = stop();
+      if (n) {
+        for (var k = 0; k < list.length; k++) P({ g: g, key: key + k, els: [list[k]], d: stop(), y: (k % 2 ? 1 : -1) * o.ny * vh, w: wide(0.9, o.nw), stop: 1 });
+        return;
+      }
+      var cols = o.cols(W), rows = o.rows(W), per = cols * rows, gapx = Math.max(16, W * 0.016);
+      var cw = Math.min(cols <= 2 ? 600 : o.max, (W * 0.92 - gapx * (cols - 1)) / cols);
+      for (var i = 0; i < list.length; i += per) {
+        var d0 = stop(), id = key + (gid++);
         for (var j = 0; j < per && i + j < list.length; j++) {
-          var k = i + j;
-          P({ g: g, key: key + k, els: [list[k]], d: d0 + (j ? 70 : 0), x: n ? 0 : (j ? 1 : -1) * o.dx * W, y: n ? (k % 2 ? 1 : -1) * o.ny * vh : (j ? -1 : 1) * o.dy * vh, w: n ? wide(0.9, o.nw) : wide(o.dw, o.max), stop: j === 0 });
+          P({ g: g, key: key + (i + j), els: [list[i + j]], d: d0, w: cw, stop: j === 0, grid: { id: id, c: j % cols, r: (j / cols) | 0, cols: cols, rows: rows, gap: gapx } });
         }
-        i += per;
       }
     };
 
     P({ g: 0, key: 'hero', els: [q1('#top')], full: true, d: stop(), stop: 1 });
 
     var dp = stop();
-    P({ g: 1, key: 'prem', els: [q1('#manifesto > .label'), q1('.manifesto__text')], d: dp, y: n ? -18 * vh : -15 * vh, w: wide(n ? 0.9 : 0.84, 1120), stop: 1 });
+    P({ g: 1, key: 'prem', els: [q1('#manifesto > .label'), q1('.manifesto__text')], d: dp, y: n ? -18 * vh : -15 * vh, w: wide(n ? 0.9 : 0.84, 1120), stop: 1, cl: 'prem' });
     qa('.manifesto__pillars li').forEach(function (li, i) {
-      P({ g: 1, key: 'pil' + i, els: [li], d: dp + i * 40, x: n ? 0 : (i - 1) * 0.3 * W, y: n ? (9 + i * 13) * vh : 27 * vh, w: n ? wide(0.84, 420) : wide(0.24, 330) });
+      P({ g: 1, key: 'pil' + i, els: [li], d: dp + i * 40, x: n ? 0 : (i - 1) * 0.3 * W, y: n ? (9 + i * 13) * vh : 27 * vh, w: n ? wide(0.84, 420) : wide(0.24, 330), cl: 'prem' });
     });
 
     var dn = stop();
-    P({ g: 2, key: 'nmeta', els: [q1('.name__meta')], d: dn + 60, x: n ? 0 : -0.04 * W, y: n ? -33 * vh : -27 * vh, w: n ? wide(0.9, 520) : wide(0.62, 760) });
-    P({ g: 2, key: 'ntitle', els: [q1('.name__title')], d: dn, x: n ? 0 : -0.04 * W, y: n ? -4 * vh : -1 * vh, w: wide(n ? 0.92 : 0.86, 1200), stop: 1 });
-    P({ g: 2, key: 'nbody', els: [q1('.name__body')], d: dn + 90, x: n ? 0 : 0.2 * W, y: n ? 27 * vh : 26 * vh, w: n ? wide(0.88, 460) : wide(0.36, 470) });
+    P({ g: 2, key: 'nmeta', els: [q1('.name__meta')], d: dn + 60, x: n ? 0 : -0.04 * W, y: n ? -33 * vh : -27 * vh, w: n ? wide(0.9, 520) : wide(0.62, 760), cl: 'name' });
+    P({ g: 2, key: 'ntitle', els: [q1('.name__title')], d: dn, x: n ? 0 : -0.04 * W, y: n ? -4 * vh : -1 * vh, w: wide(n ? 0.92 : 0.86, 1200), stop: 1, cl: 'name' });
+    P({ g: 2, key: 'nbody', els: [q1('.name__body')], d: dn + 90, x: n ? 0 : 0.2 * W, y: n ? 27 * vh : 26 * vh, w: n ? wide(0.88, 460) : wide(0.36, 470), cl: 'name' });
 
     head(3, 'shead', '.services__head', 0.8);
-    cards(3, 'svc', qa('.svc__row'), { dx: 0.235, dw: 0.4, max: 540, dy: 6, ny: 8, nw: 480 });
+    cards(3, 'svc', qa('.svc__row'), { max: 460, ny: 8, nw: 480, cols: function (W) { return W >= 1000 ? 3 : 2; }, rows: function () { return 1; } });
     head(4, 'phead', '.process__head', 0.8);
-    cards(4, 'stp', qa('.step'), { dx: 0.23, dw: 0.4, max: 520, dy: 4, ny: 9, nw: 460 });
+    cards(4, 'stp', qa('.step'), { max: 400, ny: 9, nw: 460, cols: function (W) { return W >= 1300 ? 4 : 2; }, rows: function (W) { return W >= 1300 ? 1 : 2; } });
     head(5, 'ahead', '.approach__head', 0.7);
-    cards(5, 'til', qa('.tile'), { dx: 0.24, dw: 0.38, max: 500, dy: 6, ny: 10, nw: 460 });
+    cards(5, 'til', qa('.tile'), { max: 400, ny: 10, nw: 460, cols: function (W) { return W >= 1300 ? 4 : 2; }, rows: function (W) { return W >= 1300 ? 1 : 2; } });
 
     head(6, 'ehead', '.engage__head', 0.7);
     var plans = qa('.plan');
@@ -191,6 +196,62 @@
     return null;
   }
 
+
+  // After every panel is measured: place grids of cards, then make sure panels sharing a stop never overlap.
+  function postLayout(defs, W, H) {
+    var grids = {}, clusters = {};
+    defs.forEach(function (sp, i) {
+      if (sp.grid) (grids[sp.grid.id] = grids[sp.grid.id] || []).push(i);
+      if (sp.cl) (clusters[sp.cl] = clusters[sp.cl] || []).push(i);
+    });
+    var top = 78, bot = H - 22;
+    Object.keys(grids).forEach(function (id) {
+      var idx = grids[id], g0 = defs[idx[0]].grid, cols = g0.cols, rows = g0.rows, gap = g0.gap;
+      var colW = 0, rowH = [], r, i;
+      for (r = 0; r < rows; r++) rowH[r] = 0;
+      idx.forEach(function (k) { var p = T.panels[k], g = defs[k].grid; colW = Math.max(colW, p.w); rowH[g.r] = Math.max(rowH[g.r], p.h); });
+      var totW = cols * colW + (cols - 1) * gap, totH = rowH.reduce(function (a, b) { return a + b; }, 0) + (rows - 1) * gap;
+      var sc = Math.min(1, (W * 0.94) / totW, (bot - top) / totH);
+      var y0 = (top + bot) / 2 - H / 2 - (totH * sc) / 2;                  // top edge of the grid relative to screen centre
+      idx.forEach(function (k) {
+        var p = T.panels[k], g = defs[k].grid, above = 0;
+        for (i = 0; i < g.r; i++) above += rowH[i] + gap;
+        p.fit = sc;
+        p.px = (g.c - (cols - 1) / 2) * (colW + gap) * sc;
+        p.py = y0 + above * sc + (rowH[g.r] * sc) / 2 + (rows === 1 ? (g.c % 2 ? 12 : -12) : 0);
+      });
+    });
+    Object.keys(clusters).forEach(function (id) {
+      var items = clusters[id].map(function (k) { return T.panels[k]; });
+      var gap = 16;
+      for (var pass = 0; pass < 4; pass++) {
+        items.sort(function (a, b) { return a.py - b.py; });
+        for (var i = 1; i < items.length; i++) {
+          var b = items[i];
+          for (var j = 0; j < i; j++) {
+            var a = items[j];
+            if (Math.abs(a.px - b.px) >= (a.w * a.fit + b.w * b.fit) / 2) continue;
+            var need = (a.py + a.h * a.fit / 2 + gap) - (b.py - b.h * b.fit / 2);
+            if (need > 0) b.py += need;
+          }
+        }
+        var mn = 1e9, mx = -1e9;
+        items.forEach(function (p) { mn = Math.min(mn, H / 2 + p.py - p.h * p.fit / 2); mx = Math.max(mx, H / 2 + p.py + p.h * p.fit / 2); });
+        if (mx > bot || mn < top) {
+          var shift = mx > bot ? -Math.min(mx - bot, Math.max(0, mn - top)) : Math.min(top - mn, Math.max(0, bot - mx));
+          items.forEach(function (p) { p.py += shift; });
+          mn += shift; mx += shift;
+          if (mx > bot + 1 || mn < top - 1) {
+            var s2 = (bot - top) / (mx - mn), cy = (mn + mx) / 2 - H / 2;
+            items.forEach(function (p) { p.fit *= s2; p.py = cy + (p.py - cy) * s2; });
+            continue;
+          }
+        }
+        break;
+      }
+    });
+  }
+
   function layoutWorld() {
     var W = window.innerWidth, H = window.innerHeight, n = W < 900;
     T.W = W; T.H = H; T.narrow = n;
@@ -216,6 +277,7 @@
       if (sp.stop && T.anchors[g.id] === undefined) T.anchors[g.id] = sp.d;
       last = Math.max(last, sp.d);
     });
+    postLayout(defs, W, H);
     T.lastD = last;
     T.stops.sort(function (a, b) { return a - b; });
     T.total = last;
@@ -542,19 +604,25 @@
     T.target = T.stops[i];
   }
   if (tunnelOn) {
-    // wheel: one gesture = one stop (trackpad inertia tails are part of the same gesture)
-    var wLast = 0, wAcc = 0, wDir = 0;
+    // wheel: one gesture = one stop. A big spin or a long trackpad glide never skips pages: after a step the wheel is
+    // ignored until it has settled (the inertia tail dies out) or you clearly start a new flick.
+    var wLast = 0, wStep = 0, wDir = 0, wAcc = 0, wTail = 0, wArmed = false;
     window.addEventListener('wheel', function (e) {
       if (menuOpen) return;
       if (e.target.closest && e.target.closest('textarea')) return;
       e.preventDefault();
       var dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1);
-      if (Math.abs(dy) < 3) return;
+      var mag = Math.abs(dy);
+      if (mag < 3) return;
       var dir = dy > 0 ? 1 : -1, now = performance.now(), gap = now - wLast;
       wLast = now;
-      if (gap > 100 || dir !== wDir) { wDir = dir; wAcc = 0; stepStops(dir); return; }
-      wAcc += Math.abs(dy);
-      if (wAcc > 1700) { wAcc = 0; stepStops(dir); }       // a sustained hard spin keeps going
+      var fresh = gap > 140 || dir !== wDir || mag > wTail * 2.2 + 12;
+      wTail = wTail * 0.8 + mag * 0.2; wDir = dir;
+      if (now - wStep < 650) return;                                         // cooling down after a step
+      if (fresh) { wArmed = true; wAcc = 0; }
+      if (!wArmed) return;                                                   // still the tail of the last gesture
+      wAcc += mag;
+      if (wAcc >= 28) { wAcc = 0; wArmed = false; wStep = now; stepStops(dir); }   // the small threshold ignores accidental brushes
     }, { passive: false });
 
     // touch: the camera follows your finger; on release it is thrown to the stop your flick points at
@@ -694,6 +762,34 @@
   var nextBtn = $('#briefNext'), backBtn = $('#briefBack'), nextLabel = $('#briefNextLabel');
   var errEl = $('#briefError'), barEl = $('#briefBar'), countEl = $('#briefCount');
   var ENDPOINT = (form.getAttribute('data-endpoint') || '').trim();
+
+  /* Budget bands are written in NZD; show them in the visitor's own currency, roughly rounded.
+     The brief we receive carries both, so nothing is lost in conversion. */
+  (function localiseBudget() {
+    var RATES = { USD: 0.59, AUD: 0.91, GBP: 0.46, EUR: 0.54, CAD: 0.82, SGD: 0.79, CHF: 0.52, JPY: 88, INR: 49, ZAR: 10.5, HKD: 4.6, AED: 2.2, SEK: 6.2, NOK: 6.3, DKK: 4.0, MXN: 11, BRL: 3.3, PHP: 34, MYR: 2.6, THB: 20, KRW: 800, CNY: 4.2, PLN: 2.3, ILS: 2.2, SAR: 2.2 };
+    var EURO = 'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ');
+    var BY = { US: 'USD', AU: 'AUD', GB: 'GBP', CA: 'CAD', SG: 'SGD', CH: 'CHF', JP: 'JPY', IN: 'INR', ZA: 'ZAR', HK: 'HKD', AE: 'AED', SE: 'SEK', NO: 'NOK', DK: 'DKK', MX: 'MXN', BR: 'BRL', PH: 'PHP', MY: 'MYR', TH: 'THB', KR: 'KRW', CN: 'CNY', PL: 'PLN', IL: 'ILS', SA: 'SAR' };
+    var loc = (navigator.languages && navigator.languages[0]) || navigator.language || 'en-NZ';
+    var region = ((loc.match(/[-_]([A-Za-z]{2})\b/) || [])[1] || '').toUpperCase();
+    var cur = EURO.indexOf(region) > -1 ? 'EUR' : (BY[region] || (region === 'NZ' ? 'NZD' : (region ? 'USD' : 'NZD')));
+    if (cur === 'NZD' || !RATES[cur]) return;
+    var chips = $$('input[name="budget"]', form).filter(function (i) { return /NZ\$/.test(i.value); });
+    if (!chips.length) return;
+    var sym = cur;
+    try { (new Intl.NumberFormat(loc, { style: 'currency', currency: cur, currencyDisplay: 'symbol', maximumFractionDigits: 0 })).formatToParts(1).forEach(function (pt) { if (pt.type === 'currency') sym = pt.value; }); } catch (err) {}
+    function nice(v) { var st = 5 * Math.pow(10, Math.floor(Math.log10(v)) - 1); return Math.round(v / st) * st; }
+    function fmt(v) { return v >= 1000 ? (Math.round(v / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(Math.round(v)); }
+    var edges = [5000, 10000, 25000].map(function (n) { return nice(n * RATES[cur]); });
+    var labels = ['Under ' + sym + fmt(edges[0]), sym + fmt(edges[0]) + ' \u2013 ' + fmt(edges[1]), sym + fmt(edges[1]) + ' \u2013 ' + fmt(edges[2]), sym + fmt(edges[2]) + '+'];
+    chips.forEach(function (inp, i) {
+      if (!labels[i]) return;
+      var span = inp.nextElementSibling;
+      if (span) span.textContent = labels[i];
+      inp.value = labels[i] + '  (approx. ' + inp.value.replace(/\u2013/g, '-') + ')';
+    });
+    var em = $('legend em', form); if (em) { var l = em.parentNode; if (/budget/i.test(l.textContent)) em.textContent = '(' + cur + ', approx.)'; }
+  })();
+
   var MAIL = 'contact@evanescere.xyz';
 
   function pickEngagement(name) {
